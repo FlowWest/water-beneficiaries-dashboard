@@ -59,7 +59,7 @@ selectInput(
   choices = c("Water right owner" = "water_right",
               "CVP contractor" = "cvp",
               "Public water system" = "pws",
-              "Hydropower utility" = "hydropower",
+              "Hydropower facility" = "hydropower",
               "Agricultural landowner" = "ag",
               "Business owner" = "business"),
   selected = "hydropower"
