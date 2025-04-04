@@ -10,6 +10,31 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
+library(leaflet)
+library(tidyverse)
+library(sf)
+```
+
+```{r}
+# read in processed data
+
+hydropower <- readRDS(here::here("data", "hydropower.RDS"))
+```
+
+```{r}
+filter_by_metric <- function(data, column, metric) {
+  if (metric == "None") {
+    return(data)
+  } else if (metric == "Top 10%") {
+    return(data |>  slice_max(order_by = {{ column }}, prop = 0.10))
+  } else if (metric == "Top 25%") {
+    return(data |>  slice_max(order_by = {{ column }}, prop = 0.25))
+  } else {
+    warning("Unrecognized metric. Returning all data.")
+    return(data)
+  }
+  
+}
 ```
 
 Inputs {.sidebar}
@@ -31,19 +56,19 @@ selectInput(
 selectInput(
   inputId = "select_bene",
   label = tags$strong("Select type of beneficiary"),
-  choices = c("Water right owner",
-              "CVP contractor",
-              "Public water system",
-              "Hydropower utility",
-              "Agricultural landowner",
-              "Business owner"),
-  selected = "Water right owner"
+  choices = c("Water right owner" = "water_right",
+              "CVP contractor" = "cvp",
+              "Public water system" = "pws",
+              "Hydropower utility" = "hydropower",
+              "Agricultural landowner" = "ag",
+              "Business owner" = "business"),
+  selected = "hydropower"
 )
 
 radioButtons(
   inputId = "select_metric",
   label = tags$strong("Select a metric to filter beneficiaries"),
-  choices = c("None", "Top 10", "Top 25")
+  choices = c("None", "Top 10%", "Top 25%")
 )
 
 ```
@@ -53,6 +78,50 @@ Row {.tabset}
 
 ### Map
 
+```{r}
+output$map <- renderLeaflet({
+  leaflet() |> 
+    addTiles() |> 
+    setView(lng = -122.5, lat = 39, zoom = 7)
+})
+```
+
+```{r}
+# change based off of selected dataset
+
+observe({ 
+  req(input$select_bene) 
+  req(input$select_metric)
+  if (input$select_bene == "hydropower") {
+    print(input$select_metric)
+    tmp_data <- hydropower |> 
+      filter_by_metric(total_mw, input$select_metric) |> 
+      st_as_sf() |> 
+      glimpse()
+    
+    leafletProxy("map") |> 
+      clearMarkers() |> 
+      addCircleMarkers(data = tmp_data,
+                       lng = ~longitude, 
+                       lat = ~latitude,
+                       opacity = 1, 
+                       fillOpacity = 0.8, 
+                       radius = 2,
+                       popup = ~paste(
+                         "<strong>Plant Name:</strong>", plant_name, "<br>",
+                         "<strong>Utility Name:</strong>", utility_na, "<br>",
+                         "<strong>Total Power (MW):</strong>", total_mw
+                       ))
+  } else {
+    leafletProxy("map") |>  clearMarkers()
+    # Additional logic for other beneficiary types can be added here
+  }
+})
+
+leafletOutput("map", height = "600px")
+
+
+```
 
 ### Catalog 
 
