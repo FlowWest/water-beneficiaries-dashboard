@@ -1,0 +1,60 @@
+---
+title: "Water Beneficiaries Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+   theme: readable
+   font_family: "Roboto"
+   google_fonts: true
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+```{r}
+# TODO: should we include a radio button above and is "choose to filter by watershed or NF"? 
+selectInput(
+  inputId = 'select_nf',
+  label = tags$strong('Select National Forest to identify connected benficiaries'),
+  choices = c("Mendocino NF",
+              "Shasta-Trinity NF",
+              "Six Rivers NF",
+              "Klamath NF",
+              "Mondoc NF",
+              "Lassen NF"),
+  selected = "Mendocino NF"
+)
+
+selectInput(
+  inputId = "select_bene",
+  label = tags$strong("Select type of beneficiary"),
+  choices = c("Water right owner",
+              "CVP contractor",
+              "Public water system",
+              "Hydropower utility",
+              "Agricultural landowner",
+              "Business owner"),
+  selected = "Water right owner"
+)
+
+radioButtons(
+  inputId = "select_metric",
+  label = tags$strong("Select a metric to filter beneficiaries"),
+  choices = c("None", "Top 10", "Top 25")
+)
+
+```
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+### Map
+
+
+### Catalog 
+
+
+### Summary
