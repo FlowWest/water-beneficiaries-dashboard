@@ -17,7 +17,8 @@ library(sf)
 
 ```{r}
 # read in processed data
-
+nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
+watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 hydropower <- readRDS(here::here("data", "hydropower.RDS"))
 ```
 
@@ -40,18 +41,32 @@ filter_by_metric <- function(data, column, metric) {
 Inputs {.sidebar}
 -----------------------------------------------------------------------
 ```{r}
-# TODO: should we include a radio button above and is "choose to filter by watershed or NF"? 
-# - yes, let's also include a large HUC boundary 
-selectInput(
-  inputId = 'select_nf',
-  label = tags$strong('Select National Forest to identify connected benficiaries'),
-  choices = c("Mendocino NF",
-              "Shasta-Trinity NF",
-              "Six Rivers NF",
-              "Klamath NF",
-              "Mondoc NF",
-              "Lassen NF"),
-  selected = "Mendocino NF"
+
+radioButtons(
+  inputId = "select_huc_or_nf",
+  label = tags$strong("filter by watershed or national forest?"),
+  choices = c("Watershed (HUC6)", "National Forest"),
+  selected = "National Forest"
+)
+
+conditionalPanel(
+  condition = "input.select_huc_or_nf == 'Watershed (HUC6)'",
+  selectInput(
+    inputId = 'select_huc',
+    label = tags$strong('Select watershed to identify connected benficiaries'),
+    choices = c(unique(watersheds$name)),
+    selected = "Upper Sacramento" # TODO: placeholder
+  )
+)
+
+conditionalPanel(
+  condition = "input.select_huc_or_nf == 'National Forest'",
+  selectInput(
+    inputId = 'select_nf',
+    label = tags$strong('Select National Forest to identify connected benficiaries'),
+    choices = c(unique(nf_boundaries$name)),
+    selected = "Klamath National Forest"
+  )
 )
 
 selectInput(
@@ -80,6 +95,19 @@ Row {.tabset}
 ### Map
 
 ```{r}
+boundary <- reactive({
+  if(input$select_huc_or_nf == "National Forest") {
+    print("national forest")
+    return(nf_boundaries |> filter(name == input$select_nf))
+  } else {
+    print("huc")
+   return(watersheds |> filter(name == input$select_huc))
+  }
+})
+
+```
+
+```{r}
 output$map <- renderLeaflet({
   leaflet() |> 
     addTiles() |> 
@@ -91,8 +119,7 @@ output$map <- renderLeaflet({
 # change based off of selected dataset
 
 observe({ 
-  req(input$select_bene) 
-  req(input$select_metric)
+  req(c(input$select_bene, input$select_metric)) 
   if (input$select_bene == "hydropower") {
     print(input$select_metric)
     tmp_data <- hydropower |> 
@@ -102,6 +129,9 @@ observe({
     
     leafletProxy("map") |> 
       clearMarkers() |> 
+      clearShapes() |> 
+      addPolygons(data = boundary(),
+                  popup = ~name) |> 
       addCircleMarkers(data = tmp_data,
                        lng = ~longitude, 
                        lat = ~latitude,
