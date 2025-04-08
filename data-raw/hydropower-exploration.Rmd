@@ -72,7 +72,7 @@ leaflet(data = hydropower) |>
 hydropower_clean <- hydropower |> 
   mutate(beneficiary_type = "hydropower facility",
          national_forest_connection = NA) |> 
-  select(plant_name, entity_name = utility_na, entity_address = street_add, entity_city = city, entity_state = state, entity_zip = zip, quantity_metric = total_mw, latitude, longitude, geometry) |> 
+  select(plant_name, beneficiary_type, entity_name = utility_na, entity_address = street_add, entity_city = city, entity_state = state, entity_zip = zip, quantity_metric = total_mw, national_forest_connection, latitude, longitude, geometry) |> 
   unite("entity_address", entity_address, entity_city, entity_state, entity_zip, 
         sep = ", ",   
         remove = TRUE) |> 

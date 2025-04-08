@@ -13,13 +13,16 @@ library(flexdashboard)
 library(leaflet)
 library(tidyverse)
 library(sf)
+library(DT)
 ```
 
 ```{r}
 # read in processed data
 nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
-hydropower <- readRDS(here::here("data", "hydropower.RDS"))
+hydropower <- readRDS(here::here("data", "hydropower.RDS")) #TODO: placeholder
+
+all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
 ```
 
 ```{r}
@@ -156,5 +159,25 @@ leafletOutput("map", height = "600px")
 
 ### Catalog 
 
+```{r}
+DTOutput("catalog")
+```
+
+```{r}
+output$catalog <- renderDT({
+    datatable(
+      all_datasets |> 
+        select(-c(latitude, longitude)) |> 
+        st_drop_geometry(), 
+      options = list(
+        pageLength = 10,
+        searching = TRUE,
+        ordering = TRUE
+      )
+    )
+})
+
+
+```
 
 ### Summary
