@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+    <idinfo>
+        <citation>
+            <citeinfo>
+                <pubdate>20200710</pubdate>
+                <title>Power Plants</title>
+                <geoform>vector digital data</geoform>
+            </citeinfo>
+        </citation>
+        <descript>
+            <abstract>The attribute data for this point dataset come from the U.S. Energy Information Administration, EIA-860, Annual Electric Generator Report; EIA-860M, Monthly Update to the Annual Electric Generator Report; and EIA-923, Power Plant Operations Report. It includes all operable  plants by energy source with a combined nameplate capacity of 1 megawatt or more that are operating, are on standby, or out of service for short- or long-term.</abstract>
+            <purpose>These data identify operable electric generating plants in the United States by energy source, as of June 2024.</purpose>
+        </descript>
+        <status>
+            <update>Quarterly</update>
+        </status>
+        <spdom>
+            <bounding>
+                <westbc>-171.712439</westbc>
+                <eastbc>-65.279560</eastbc>
+                <northbc>71.292000</northbc>
+                <southbc>17.947115</southbc>
+            </bounding>
+        </spdom>
+        <keywords>
+            <theme>
+                <themekt>None</themekt>
+                <themekey>energy, infrastructure, electricity, power plants,  biomass, coal, geothermal, hydroelectric, natural gas, nuclear, petroleum, pumped storage, solar, wind, USA, EIA, shapefile, geospatial</themekey>
+            </theme>
+            <theme>
+                <themekt>ISO 19115 Topic Categories</themekt>
+                <themekey>location</themekey>
+            </theme>
+            <place>
+                <placekt>None</placekt>
+                <placekey>United States</placekey>
+            </place>
+            <place>
+                <placekt>None</placekt>
+                <placekey>United States, USA</placekey>
+            </place>
+        </keywords>
+        <accconst>None</accconst>
+        <useconst>None (public use). Users are advised to thoroughly review the metadata to understand the appropriate use and limitations of the data. These data and related graphics, if available, are not legal documents and are not intended to be used as such. The information contained in these data is dynamic and may change over time. The U.S. Energy Information Administration gives no warranty, expressed or implied, as to the accuracy, reliability, or completeness of these data.</useconst>
+        <ptcontac>
+            <cntinfo>
+                <cntperp>
+                    <cntper>EIA mapping feedback: mapping@eia.gov </cntper>
+                </cntperp>
+            </cntinfo>
+        </ptcontac>
+        <datacred>U.S. Energy Information Administration</datacred>
+        <native>Esri ArcGIS 13.0.3.36057</native>
+    </idinfo>
+    <dataqual>
+        <lineage>
+            <procstep>
+                <procdesc>Data for each power plant was aggregated from more granular generator level information.  Each plant's primary energy source was determined by the energy source for that plant with the largest nameplate capacity.</procdesc>
+            </procstep>
+        </lineage>
+    </dataqual>
+    <spdoinfo>
+        <direct>Vector</direct>
+        <ptvctinf>
+            <sdtsterm>
+                <sdtstype>Entity point</sdtstype>
+                <ptvctcnt>0</ptvctcnt>
+            </sdtsterm>
+        </ptvctinf>
+    </spdoinfo>
+    <eainfo>
+        <detailed>
+            <enttyp>
+                <enttypl>PowerPlants_staging</enttypl>
+                <enttypds>EIA</enttypds>
+            </enttyp>
+            <attr>
+                <attrlabl>OBJECTID</attrlabl>
+                <attrdef>Internal feature number.</attrdef>
+                <attrdefs>Esri</attrdefs>
+                <attrdomv>
+                                        
+                    <udom>Sequential unique whole numbers that are automatically generated.</udom>
+                                    
+                </attrdomv>
+            </attr>
+            <attr>
+                <attrlabl>Plant_Code</attrlabl>
+                <attrdef>EIA-assigned plant identification number.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Plant_Name</attrlabl>
+                <attrdef>Name of power plant.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Utility_Name</attrlabl>
+                <attrdef>Legal name of the company that is responsible for the day-to-day operations of the generator.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Utility_ID</attrlabl>
+                <attrdef>EIA-assigned identification number for the company that is responsible for the day-to-day operations of the generator.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>sector_name</attrlabl>
+                <attrdef>Plant-level sector name, designated by the primary purpose, regulatory status and plant-level combined heat and power status. </attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>City</attrlabl>
+                <attrdef>City location of power plant.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>County</attrlabl>
+                <attrdef>County location of power plant.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Zip</attrlabl>
+                <attrdef>Zip code of power plant.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>State</attrlabl>
+            </attr>
+            <attr>
+                <attrlabl>Street_Address</attrlabl>
+                <attrdef>Street address of power plant.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>PrimSource</attrlabl>
+                <attrdef>The most predominant type of energy that fuels the generator.  The primary energy source is determined by net summer capacity. </attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Install_MW</attrlabl>
+                <attrdef>The total combined generator nameplate capacity (installed). Installed capacity is determined by the highest value on the generator nameplate in megawatts rounded to the nearest tenth.  The maximum rated output of a generator, prime mover, or other electric power production equipment under specific conditions designated by the manufacturer and expressed in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Total_MW</attrlabl>
+                <attrdef>The maximum output, as measured in alternating current (AC), commonly expressed in megawatts (MW), that generating equipment can supply to system load, as demonstrated by a multi-hour test, at the time of summer peak demand (period of June 1 through September 30.) This output reflects a reduction in capacity due to electricity use for station service or auxiliaries.</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>Coal_MW</attrlabl>
+                <attrdef>Net summer capacity of coal-fired electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>NG_MW</attrlabl>
+                <attrdef>Net summer capacity of natural gas fired electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Crude_MW</attrlabl>
+                <attrdef>Net summer capacity of petroleum-fired electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Bio_MW</attrlabl>
+                <attrdef>Net summer capacity of biomass electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Hydro_MW</attrlabl>
+                <attrdef>Net summer capacity of hydroelectric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>HydroPS_MW</attrlabl>
+                <attrdef>Net summer capacity of pumped-storage hydroelectric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Nuclear_MW</attrlabl>
+                <attrdef>Net summer capacity of nuclear power electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Solar_MW</attrlabl>
+                <attrdef>Net summer capacity of solar powered electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Wind_MW</attrlabl>
+                <attrdef>Net summer capacity of wind turbine electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Geo_MW</attrlabl>
+                <attrdef>Net summer capacity of geothermal powered electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Bat_MW</attrlabl>
+                <attrdef>Net summer capacity of battery powered electric generators in megawatts (MW).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Other_MW</attrlabl>
+                <attrdef>Net summer capacity of electric generators powered by other energy sources not specified in the other categories in megawatts (MW). These include energy storage technologies (e.g., compressed air, batteries, and fly wheels), purchased steam, waste heat not directly attributed to a fuel source, and tire-derived fuels.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>source_desc</attrlabl>
+                <attrdef>Energy sources and corresponding net summer capacities for the power plant.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>tech_desc</attrlabl>
+                <attrdef>The type(s) of technology (prime mover). The engine, turbine, water wheel, or similar machine that drives an electric generator; or, for reporting purposes, a device that converts energy to electricity directly (e.g., photovoltaic solar and fuel cells).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Source</attrlabl>
+                <attrdef>The EIA source surveys for the power plants map data.</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Period</attrlabl>
+                <attrdef>The reporting period (currency) of the data (yyyymm).</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Latitude</attrlabl>
+                <attrdef>The latitude of the power plant in decimal degrees calculated in ArcMap using GCS: WGS 84 (EPSG:4326)</attrdef>
+                <attrdefs>EIA</attrdefs>
+            </attr>
+            <attr>
+                <attrlabl>Longitude</attrlabl>
+                <attrdef>The longitude of the power plant in decimal degrees calculated in ArcMap using GCS: WGS 84 (EPSG:4326)</attrdef>
+            </attr>
+            <attr>
+                <attrlabl>Shape</attrlabl>
+                <attrdef>Feature geometry.</attrdef>
+                <attrdefs>Esri</attrdefs>
+                <attrdomv>
+                                        
+                    <udom>Coordinates defining the features.</udom>
+                                    
+                </attrdomv>
+            </attr>
+        </detailed>
+    </eainfo>
+    <metainfo>
+        <metd>20240910</metd>
+        <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+        <metstdv>FGDC-STD-001-1998</metstdv>
+        <mettc>local time</mettc>
+        <metuc>None (public use)</metuc>
+    </metainfo>
+</metadata>

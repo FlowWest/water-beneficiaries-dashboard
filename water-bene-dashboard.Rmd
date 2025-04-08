@@ -41,6 +41,7 @@ Inputs {.sidebar}
 -----------------------------------------------------------------------
 ```{r}
 # TODO: should we include a radio button above and is "choose to filter by watershed or NF"? 
+# - yes, let's also include a large HUC boundary 
 selectInput(
   inputId = 'select_nf',
   label = tags$strong('Select National Forest to identify connected benficiaries'),

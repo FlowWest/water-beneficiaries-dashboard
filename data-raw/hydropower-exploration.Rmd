@@ -1,0 +1,86 @@
+---
+title: "Data Exploration - Hydropower "
+author: "Maddee Wiggins"
+date: "March 2025"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width=15, fig.height=10)
+library(tidyverse)
+library(leaflet)
+```
+
+The purpose of this markdown is to get familiar with the dataset, identify any limitations, determine if it is useful and why, and any data processing that needs to be done.
+
+**Data Source**
+
+Power plant data was sourced from the [U.S. Energy Atlas](https://atlas.eia.gov/datasets/bf5c5110b1b944d299bb683cdbd02d2a_0/explore?location=32.051243%2C61.504000%2C2.53)
+
+**Challenges:**
+
+```{r, echo=FALSE}
+
+all_power_plants <- sf::read_sf(here::here('data-raw', 'shapefiles', 'Power_Plants', "Power_Plants.shp")) |> 
+  janitor::clean_names() |> 
+  filter(state == "California") 
+
+```
+
+There are multiple types of power plants in the dataset (`r paste0(unique(all_power_plants$prim_source), collapse = ", ")`) but we want to filter to just hydroelectric 
+
+```{r echo=FALSE}
+hydropower <- all_power_plants |> 
+  filter(prim_source == "hydroelectric") |> 
+  select(where(~!all(is.na(.)))) # filters columns that are all NA
+
+DT::datatable(hydropower |> 
+                arrange(desc(hydro_mw)), options = list(
+                  scrollX = TRUE,  
+                  pageLength = 10 
+                ))
+```
+
+```{r echo=FALSE}
+pal <- colorNumeric(palette = "Blues", domain = hydropower$hydro_mw)
+
+leaflet(data = hydropower) |> 
+  addTiles() |> 
+  addCircleMarkers(data = hydropower,
+                   ~longitude, ~latitude,
+                   fillColor = ~pal(hydro_mw),
+                   color = ~pal(hydro_mw),
+                   radius = ~sqrt(hydro_mw) * 2,
+                   opacity = 1, 
+                   fillOpacity = 0.8,
+                   popup = ~paste(
+                     "<strong>Plant Name:</strong>", plant_name, "<br>",
+                     "<strong>Utility Name:</strong>", utility_na, "<br>",
+                     "<strong>Source Description:</strong>", source_des
+                   )) |> 
+  addLegend(position = "bottomright", 
+            pal = pal, 
+            values = ~hydro_mw, 
+            title = "Hydro MW", 
+            opacity = 1)
+
+
+```
+
+## Save processed data 
+```{r}
+hydropower_clean <- hydropower |> 
+  mutate(beneficiary_type = "hydropower facility",
+         national_forest_connection = NA) |> 
+  select(plant_name, entity_name = utility_na, entity_address = street_add, entity_city = city, entity_state = state, entity_zip = zip, quantity_metric = total_mw, latitude, longitude, geometry) |> 
+  unite("entity_address", entity_address, entity_city, entity_state, entity_zip, 
+        sep = ", ",   
+        remove = TRUE) |> 
+  unite('entity_name', entity_name, plant_name, sep = " - ", remove = TRUE) |> 
+  mutate(quantity_unit = "MW") |> 
+  glimpse()
+
+
+saveRDS(hydropower_clean, here::here("data-raw", "hydropower_clean.RDS"))
+```
+
