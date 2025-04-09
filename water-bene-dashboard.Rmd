@@ -104,7 +104,7 @@ boundary <- reactive({
     return(nf_boundaries |> filter(name == input$select_nf))
   } else {
     print("huc")
-   return(watersheds |> filter(name == input$select_huc))
+    return(watersheds |> filter(name == input$select_huc))
   }
 })
 
@@ -116,6 +116,16 @@ output$map <- renderLeaflet({
     addTiles() |> 
     setView(lng = -122.5, lat = 39, zoom = 7)
 })
+```
+
+```{r}
+filtered_dataset <- reactive({
+  if (input$select_bene == "hydropower") {
+    return(all_datasets |> filter(beneficiary_type == "hydropower facility"))
+  }
+})
+
+
 ```
 
 ```{r}
@@ -135,7 +145,7 @@ observe({
       clearShapes() |> 
       addPolygons(data = boundary(),
                   popup = ~name) |> 
-      addCircleMarkers(data = tmp_data,
+      addCircleMarkers(data = tmp_data, #filtered_dataset()
                        lng = ~longitude, 
                        lat = ~latitude,
                        opacity = 1, 
@@ -165,16 +175,16 @@ DTOutput("catalog")
 
 ```{r}
 output$catalog <- renderDT({
-    datatable(
-      all_datasets |> 
-        select(-c(latitude, longitude)) |> 
-        st_drop_geometry(), 
-      options = list(
-        pageLength = 10,
-        searching = TRUE,
-        ordering = TRUE
-      )
+  datatable(
+    all_datasets |> 
+      select(-c(latitude, longitude)) |> 
+      st_drop_geometry(), 
+    options = list(
+      pageLength = 10,
+      searching = TRUE,
+      ordering = TRUE
     )
+  )
 })
 
 
