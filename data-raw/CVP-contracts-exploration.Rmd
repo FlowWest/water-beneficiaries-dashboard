@@ -180,41 +180,16 @@ These geospatial data is being used for those contractors that are listed as Cou
 Source: [CAL Fire eGIS portal](https://hub-calfire-forestry.hub.arcgis.com/datasets/8713ced9b78a4abb97dc130a691a8695_0/explore) 
 
 ```{r include=FALSE}
-url <- "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/California_County_Boundaries/FeatureServer/0/query"
-
-params <- list(where = "1=1",
-               outFields = "*",
-               f = "geojson",
-               outSR = "4326")
-
-res <- GET(url, query = params)
-
-temp_geojson <- tempfile(fileext = ".geojson")
-writeBin(content(res, "raw"), temp_geojson)
-county_boundaries <- st_read(temp_geojson)
-
-# filtering out just the counties of interest 
-county_boundaries_swp <- county_boundaries |> 
-  filter(COUNTY_NAME == "Colusa" |
-         COUNTY_NAME == "Fresno" |
-         COUNTY_NAME == "Madera" |
-         COUNTY_NAME == "Tulare") |> 
-  clean_names() |> 
-  glimpse()
-```
-
-```{r}
 shp_path_co <- "data-raw/CVP/cvp_counties_shp/cnty19_1.shp"
-county_boundaries_swp <- st_read(shp_path_co) |>
+cvp_co_geo_data <- st_read(shp_path_co) |>
   clean_names() |> 
   rename(county_name = county_nam) |> 
   glimpse()
 
-county_boundaries_swp <- county_boundaries_swp |> 
+county_boundaries_swp <- cvp_co_geo_data |> 
   st_as_sf() |> 
   st_make_valid() |> 
-  st_transform(crs = 4326) 
-
+  st_transform(crs = 4326)
 ```
 
 Plotting those counties of interest 
@@ -562,8 +537,9 @@ cvp <- cvp_w_locations_2 |>
 
 ```
 
+
 ```{r}
 # save clean data
-saveRDS(cvp, here::here("data", "cvp.RDS"))
+# saveRDS(cvp, here::here("data", "cvp.RDS"))
 ```
 
