@@ -564,6 +564,6 @@ cvp <- cvp_w_locations_2 |>
 
 ```{r}
 # save clean data
-# saveRDS(cvp, here::here("data-raw", "cvp_clean.RDS"))
+saveRDS(cvp, here::here("data", "cvp.RDS"))
 ```
 
