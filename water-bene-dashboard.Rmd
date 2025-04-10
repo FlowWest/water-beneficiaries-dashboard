@@ -120,9 +120,15 @@ output$map <- renderLeaflet({
 
 ```{r}
 filtered_dataset <- reactive({
-  if (input$select_bene == "hydropower") {
-    return(all_datasets |> filter(beneficiary_type == "hydropower facility"))
-  }
+  req(input$select_bene)
+  
+  all_datasets |> 
+    filter(beneficiary_type == case_when(
+      input$select_bene == "hydropower" ~ "hydropower facility",
+      input$select_bene == "cvp" ~ "CVP contractor",
+      # input$select_bene == "pws" ~ "Public water system",
+      TRUE ~ NA_character_  # fallback
+    ))
 })
 
 
@@ -130,37 +136,52 @@ filtered_dataset <- reactive({
 
 ```{r}
 # change based off of selected dataset
-
 observe({ 
-  req(c(input$select_bene, input$select_metric)) 
-  if (input$select_bene == "hydropower") {
-    print(input$select_metric)
-    tmp_data <- hydropower |> 
-      filter_by_metric(total_mw, input$select_metric) |> 
-      st_as_sf() |> 
-      glimpse()
-    
+  req(input$select_bene, input$select_metric)
+  
+  tmp_data <- filtered_dataset() |> 
+  filter_by_metric(quantity_metric, input$select_metric) |> 
+  st_transform(4326)
+  
+  # Universal popup for all beneficiary types
+  popup_content <- ~paste(
+    "<strong>Entity Name:</strong>", entity_name, "<br>",
+    "<strong>Address:</strong>", entity_address, "<br>",
+    "<strong>Quantity:</strong>", quantity_metric, quantity_unit
+  )
+  
+  # Geometry check
+  is_polygon <- st_geometry_type(tmp_data) %in% c("POLYGON", "MULTIPOLYGON")
+  polygons <- tmp_data[is_polygon, ]
+  points <- tmp_data[!is_polygon, ]
+  
+  # Clear and add layers
+  leafletProxy("map") |> 
+    clearMarkers() |> 
+    clearShapes() |> 
+    addPolygons(data = boundary(), popup = ~name)
+  
+  if (nrow(polygons) > 0) {
     leafletProxy("map") |> 
-      clearMarkers() |> 
-      clearShapes() |> 
-      addPolygons(data = boundary(),
-                  popup = ~name) |> 
-      addCircleMarkers(data = tmp_data, #filtered_dataset()
+      addPolygons(data = polygons,
+                  weight = 1,
+                  color = "brown",
+                  fillOpacity = 0.2,
+                  popup = popup_content)
+  }
+  
+  if (nrow(points) > 0) {
+    leafletProxy("map") |> 
+      addCircleMarkers(data = points,
                        lng = ~longitude, 
                        lat = ~latitude,
                        opacity = 1, 
                        fillOpacity = 0.8, 
                        radius = 2,
-                       popup = ~paste(
-                         "<strong>Plant Name:</strong>", plant_name, "<br>",
-                         "<strong>Utility Name:</strong>", utility_na, "<br>",
-                         "<strong>Total Power (MW):</strong>", total_mw
-                       ))
-  } else {
-    leafletProxy("map") |>  clearMarkers()
-    # Additional logic for other beneficiary types can be added here
+                       popup = popup_content)
   }
 })
+
 
 leafletOutput("map", height = "600px")
 
