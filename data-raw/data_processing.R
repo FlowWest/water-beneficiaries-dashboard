@@ -25,10 +25,24 @@ cvp <- cvp |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
+# swp
+swp <- readRDS(here::here("data", "swp.RDS"))
+swp <- st_make_valid(swp)
+swp_centroids <- st_centroid(swp)
+swp_coords <- st_coordinates(swp_centroids)
+swp$longitude <- swp_coords[,1]
+swp$latitude <- swp_coords[,2]
+
+swp <- swp |>
+  st_set_crs(4326) |>
+  st_transform(3857) |>
+  select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
+         national_forest_connection, latitude, longitude, geometry)
+
 
 # save dataset ------------------------------------------------------------
 
-all_datasets <- bind_rows(hydropower, cvp)
+all_datasets <- bind_rows(hydropower, cvp, swp)
 
 
 # map datasets to NF and HUCs ---------------------------------------------
