@@ -10,7 +10,7 @@ library(sf)
 # hydropower
 hydropower <- readRDS('data-raw/hydropower_clean.RDS') |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit, national_forest_connection, latitude, longitude, geometry) |>
-   st_transform(3310)
+   st_transform(4326)
 
 # cvp
 cvp <- readRDS(here::here("data", "cvp.RDS"))
@@ -22,7 +22,7 @@ cvp$latitude <- cvp_coords[,2]
 
 cvp <- cvp |>
   st_set_crs(4326) |>
-  st_transform(3310) |>
+  st_transform(4326) |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
@@ -36,7 +36,7 @@ swp$latitude <- swp_coords[,2]
 
 swp <- swp |>
   st_set_crs(4326) |>
-  st_transform(3310) |>
+  st_transform(4326) |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
