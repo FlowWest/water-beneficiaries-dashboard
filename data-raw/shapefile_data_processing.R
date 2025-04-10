@@ -14,12 +14,24 @@ nf_raw <- read_sf(here::here('data-raw', 'shapefiles', 'nf_boundaries', 'S_USA.N
 
 unique(nf_bounds$nfslandu_2)
 
-names <- c('Klamath National Forest',
+names <- c('Angeles National Forest',
+           'Cleveland National Forest',
+           'Eldorado National Forest',
+           'Inyo National Forest',
+           'Klamath National Forest',
+           'Tahoe National Forest',
            'Lassen National Forest',
+           'Los Padres National Forest',
            'Mendocino National Forest',
+           'Plumas National Forest',
+           'San Bernardino National Forest',
+           'Sequoia National Forest',
            'Shasta National Forest',
+           'Trinity National Forest',
+           'Sierra National Forest',
            'Modoc National Forest',
-           'Six Rivers National Forest')
+           'Six Rivers National Forest',
+           'Stanislaus National Forest')
 
 nf_bounds <- nf_raw |>
   filter(nfslandu_2 %in% names) |>
