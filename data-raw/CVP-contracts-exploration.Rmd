@@ -524,7 +524,7 @@ map |>
 glimpse(cvp_w_locations_2)
 
 cvp <- cvp_w_locations_2 |> 
-  mutate(beneficiary_type = "CVP contractor",
+  mutate(beneficiary_type = "cvp contractor",
          national_forest_connection = NA,
          entity_name = water_service_contract,
          entity_address = NA,
@@ -540,6 +540,6 @@ cvp <- cvp_w_locations_2 |>
 
 ```{r}
 # save clean data
-# saveRDS(cvp, here::here("data", "cvp.RDS"))
+saveRDS(cvp, here::here("data", "cvp.RDS"))
 ```
 
