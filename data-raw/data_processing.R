@@ -6,9 +6,12 @@ library(sf)
 
 
 # load in datasets --------------------------------------------------------
+
+# hydropower
 hydropower <- readRDS('data-raw/hydropower_clean.RDS') |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit, national_forest_connection, latitude, longitude, geometry)
 
+# cvp
 cvp <- readRDS(here::here("data", "cvp.RDS"))
 
 cvp_centroids <- st_centroid(cvp)
@@ -17,11 +20,10 @@ cvp$longitude <- cvp_coords[,1]
 cvp$latitude <- cvp_coords[,2]
 
 cvp <- cvp |>
-  st_set_crs(4326) |>              # Set the original CRS (if missing)
-  st_transform(3857) |>            # Now transform to EPSG:3857
+  st_set_crs(4326) |>
+  st_transform(3857) |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
-         national_forest_connection, latitude, longitude, geometry) |>
-  glimpse()
+         national_forest_connection, latitude, longitude, geometry)
 
 
 # save dataset ------------------------------------------------------------
