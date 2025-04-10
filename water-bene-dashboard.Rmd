@@ -198,10 +198,14 @@ DTOutput("catalog")
 
 ```{r}
 output$catalog <- renderDT({
+  req(input$select_bene, input$select_metric)
+
+  tmp_data <- filtered_dataset() |>
+    filter_by_metric(quantity_metric, input$select_metric) |>
+    st_drop_geometry()  
+
   datatable(
-    all_datasets |> 
-      select(-c(latitude, longitude)) |> 
-      st_drop_geometry(), 
+    tmp_data,
     options = list(
       pageLength = 10,
       searching = TRUE,
@@ -209,7 +213,6 @@ output$catalog <- renderDT({
     )
   )
 })
-
 
 ```
 
