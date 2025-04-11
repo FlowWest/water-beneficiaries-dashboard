@@ -91,7 +91,7 @@ watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
 all_datasets <- readRDS(here::here("data", "all_datasets.RDS")) |>
   st_make_valid()
 
-# approach 1
+# approach 1 ---
 
 # all_datasets_with_watershed <- st_join(all_datasets, watersheds, left = FALSE) |>
 #   glimpse()
@@ -100,7 +100,7 @@ all_datasets <- readRDS(here::here("data", "all_datasets.RDS")) |>
 #
 # all_data_full <- st_join(all_datasets_with_watershed, watersheds_with_nf, left = TRUE)
 
-# approach 2
+# approach 2 --
 
 #joining all datasets with watersheds
 all_datasets_watershed <- st_join(all_datasets, watersheds, left = TRUE) |> glimpse()
@@ -108,21 +108,57 @@ all_datasets_watershed <- st_join(all_datasets, watersheds, left = TRUE) |> glim
 # keeping only the name field for nf
 nf_keys <- nf_boundaries[, c("name")]
 
-# joining dataset with watershed and nf names, based on geometry
-watershed_nf_lookup <- st_join(watersheds, nf_keys, left = TRUE)
+# # joining dataset with watershed and nf names, based on geometry
+# watershed_nf_lookup <- st_join(watersheds, nf_keys, left = TRUE)
+#
+# watershed_nf <- watershed_nf_lookup |>
+#   st_drop_geometry() |>
+#   distinct(huc6, .keep_all = TRUE)  # avoiding duplicates
+#
+# all_datasets_results <- left_join(all_datasets_watershed, watershed_nf, by = "huc6") |>
+#   st_transform(4326) |>
+#   rename(watershed = name.x,
+#          nf = name.y) |>
+#   glimpse()
+#
+# # split points and polygons for plotting purposes
+#
+# geom_types <- st_geometry_type(all_datasets_results)
+#
+# # Separate point and polygon features
+# result_points <- all_datasets_results[geom_types %in% c("POINT", "MULTIPOINT"), ]
+# result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
 
-watershed_nf <- watershed_nf_lookup |>
+
+# approach 3 ---
+watersheds <- watersheds |>
+  rename(watershed_name = name)
+
+nf_boundaries <- nf_boundaries |>
+  rename(nf_name = name)
+
+# assign overlap watershed to datasets
+all_datasets_with_ws <- st_join(all_datasets, watersheds[, "watershed_name"], left = TRUE)
+# assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
+watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
   st_drop_geometry() |>
-  distinct(huc6, .keep_all = TRUE)  # avoiding duplicates
+  distinct(watershed_name, nf_name) |>
+  glimpse()
 
-all_datasets_results <- left_join(all_datasets_watershed, watershed_nf, by = "huc6") |>
-  st_transform(4326) |>
-  rename(watershed = name.x,
-         nf = name.y) |>
+# keep this for now, may use for tabular data?
+# watershed_nf_lookup <- watershed_nf_lookup |>
+#   st_drop_geometry() |>
+#   group_by(watershed_name) |>
+#   summarise(nf = paste(unique(nf_name), collapse = ", ")) |>
+#   glimpse()
+
+# join to find dataset-nf relationship, add geometry from original all_datasets
+all_datasets_results <- left_join(all_datasets_with_ws, watershed_nf, by = "watershed_name") |>
+  select(-national_forest_connection) |>
+  rename(national_forest_connection = nf_name) |>
   glimpse()
 
 # split points and polygons for plotting purposes
-
 geom_types <- st_geometry_type(all_datasets_results)
 
 # Separate point and polygon features
@@ -130,7 +166,8 @@ result_points <- all_datasets_results[geom_types %in% c("POINT", "MULTIPOINT"), 
 result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
 
 
-# plotting both nf and watersheds, plus all_datasets
+
+# plotting both nf and watersheds, plus all_datasets ---
 leaflet() |>
   addTiles() |>
   addPolygons(data = nf_boundaries,
@@ -138,13 +175,13 @@ leaflet() |>
               color = "blue",
               weight = 1,
               fillOpacity = 0.3,
-              popup = ~name) |>
+              popup = ~nf_name) |>
   addPolygons(data = watersheds,
               group = "Watersheds",
               color = "green",
               weight = 1,
               fillOpacity = 0.3,
-              popup = ~name) |>
+              popup = ~watershed_name) |>
   # point beneficiaries
   addCircleMarkers(data = result_points,
                    group = "Beneficiaries (Points)",
@@ -154,8 +191,8 @@ leaflet() |>
                    fillOpacity = 0.7,
                    popup = ~paste(
                      "<strong>Beneficiary Type:</strong>", beneficiary_type,
-                     "<br><strong>Watershed:</strong>", watershed,
-                     "<br><strong>National Forest:</strong>", nf)) |>
+                     "<br><strong>Watershed:</strong>", watershed_name,
+                     "<br><strong>National Forest:</strong>", national_forest_connection)) |>
   # polygon-based beneficiaries
   addPolygons(data = result_polygons,
               group = "Beneficiaries (Polygons)",
@@ -164,8 +201,8 @@ leaflet() |>
               fillOpacity = 0.5,
               popup = ~paste(
                 "<strong>Beneficiary Type:</strong>", beneficiary_type,
-                "<br><strong>Watershed:</strong>", watershed,
-                "<br><strong>National Forest:</strong>", nf)) |>
+                "<br><strong>Watershed:</strong>", watershed_name,
+                "<br><strong>National Forest:</strong>", national_forest_connection)) |>
   addLayersControl(
     overlayGroups = c("National Forests", "Watersheds",
                       "Beneficiaries (Points)", "Beneficiaries (Polygons)"),
