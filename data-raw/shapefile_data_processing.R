@@ -138,7 +138,7 @@ nf_boundaries <- nf_boundaries |>
   rename(nf_name = name)
 
 # assign overlap watershed to datasets
-all_datasets_with_ws <- st_join(all_datasets, watersheds[, "watershed_name"], left = TRUE)
+all_datasets_with_ws <- st_join(all_datasets, watersheds, left = TRUE)
 # assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
 watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
   st_drop_geometry() |>
@@ -160,14 +160,13 @@ all_datasets_results <- left_join(all_datasets_with_ws, watershed_nf, by = "wate
 
 # split points and polygons for plotting purposes
 geom_types <- st_geometry_type(all_datasets_results)
-
-# Separate point and polygon features
 result_points <- all_datasets_results[geom_types %in% c("POINT", "MULTIPOINT"), ]
 result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
 
+# save data
+saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
 
-
-# plotting both nf and watersheds, plus all_datasets ---
+# plotting both nf and watersheds, plus all_datasets to check accuracy---
 leaflet() |>
   addTiles() |>
   addPolygons(data = nf_boundaries,

@@ -22,7 +22,8 @@ nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 hydropower <- readRDS(here::here("data", "hydropower.RDS")) #TODO: placeholder
 
-all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
+# all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
+all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS"))
 ```
 
 ```{r}
@@ -57,7 +58,7 @@ conditionalPanel(
   selectInput(
     inputId = 'select_huc',
     label = tags$strong('Select watershed to identify connected benficiaries'),
-    choices = c(unique(watersheds$name)),
+    choices = c(unique(all_datasets$watershed_name)),
     selected = "Upper Sacramento" # TODO: placeholder
   )
 )
@@ -67,7 +68,10 @@ conditionalPanel(
   selectInput(
     inputId = 'select_nf',
     label = tags$strong('Select National Forest to identify connected benficiaries'),
-    choices = c(unique(nf_boundaries$name)),
+    choices = c(unique(all_datasets$national_forest_connection)),
+    # choices = c("Eldorado National Forest", "Lassen National Forest", "Mendocino National Forest", "Plumas National Forest", 
+    #             "Shasta-Trinity National Forest", "Tahoe National Forest", "Trinity National Forest", "Klamath National Forest",
+    #             "Modoc National Forest", "Six Rivers National Forest"),
     selected = "Klamath National Forest"
   )
 )
@@ -99,15 +103,17 @@ Row {.tabset}
 ### Map
 
 ```{r}
-boundary <- reactive({
-  if(input$select_huc_or_nf == "National Forest") {
-    print("national forest")
-    return(nf_boundaries |> filter(name == input$select_nf))
-  } else {
-    print("huc")
-    return(watersheds |> filter(name == input$select_huc))
-  }
-})
+# keeping code in case we want to add the nf and huc boundaries
+# boundary <- reactive({
+#   if(input$select_huc_or_nf == "National Forest") {
+#     print("national forest")
+#     return(nf_boundaries |> filter(name == input$select_nf))
+#   } else {
+#     print("huc")
+#     return(watersheds |> filter(name == input$select_huc))
+#   }
+# })
+ # TODO save the all_datasets_results as a rds, then add it here instead of nf_boundaries
 
 ```
 
@@ -120,24 +126,52 @@ output$map <- renderLeaflet({
 ```
 
 ```{r}
-filtered_dataset <- reactive({
-  req(input$select_bene)
-  
-  all_datasets |> 
-    filter(beneficiary_type == case_when(
-      input$select_bene == "hydropower" ~ "hydropower facility",
-      input$select_bene == "cvp" ~ "cvp contractor",
-      input$select_bene == "swp" ~ "swp contractor",
-      # input$select_bene == "pws" ~ "Public water system",
-      TRUE ~ NA_character_  # fallback
-    ))
-})
+# filtered_dataset <- reactive({
+#   req(input$select_bene)
+#   
+#   all_datasets |> 
+#     filter(beneficiary_type == case_when(
+#       input$select_bene == "hydropower" ~ "hydropower facility",
+#       input$select_bene == "cvp" ~ "cvp contractor",
+#       input$select_bene == "swp" ~ "swp contractor",
+#       # input$select_bene == "pws" ~ "Public water system",
+#       TRUE ~ NA_character_  # fallback
+#     ))
+# })
+# 
+# filtered_dataset <- reactive({
+#   req(input$select_nf)
+# 
+#   all_datasets |> 
+#     filter(national_forest_connection == input$select_nf)
+# })
 
+filtered_dataset <- reactive({
+  req(input$select_bene, input$select_huc_or_nf)
+  
+    bene_type <- case_when(
+    input$select_bene == "hydropower" ~ "hydropower facility",
+    input$select_bene == "cvp" ~ "cvp contractor",
+    input$select_bene == "swp" ~ "swp contractor",
+    TRUE ~ NA_character_
+  )
+
+  data <- all_datasets |> filter(beneficiary_type == bene_type)
+
+  if (input$select_huc_or_nf == "National Forest" && !is.null(input$select_nf)) {
+    data <- data |> filter(national_forest_connection == input$select_nf)
+  }
+
+  if (input$select_huc_or_nf == "Watershed (HUC6)" && !is.null(input$select_huc)) {
+    data <- data |> filter(watershed_name == input$select_huc)
+  }
+
+  return(data)
+})
 
 ```
 
 ```{r}
-# change based off of selected dataset
 observe({ 
   req(input$select_bene, input$select_metric)
   
@@ -145,43 +179,43 @@ observe({
   filter_by_metric(quantity_metric, input$select_metric) |> 
   st_transform(4326)
   
-  # Universal popup for all beneficiary types
+  # popup for all beneficiary types - consider adding more fields?
   popup_content <- ~paste(
     "<strong>Entity Name:</strong>", entity_name, "<br>",
     "<strong>Address:</strong>", entity_address, "<br>",
     "<strong>Quantity:</strong>", quantity_metric, quantity_unit
   )
   
-  # Geometry check
+  # split polygons and points for plotting purposes
   is_polygon <- st_geometry_type(tmp_data) %in% c("POLYGON", "MULTIPOLYGON")
   polygons <- tmp_data[is_polygon, ]
   points <- tmp_data[!is_polygon, ]
   
   # Clear and add layers
-  leafletProxy("map") |> 
-    clearMarkers() |> 
-    clearShapes() |> 
-    addPolygons(data = boundary(), popup = ~name)
-  
-  if (nrow(polygons) > 0) {
-    leafletProxy("map") |> 
-      addPolygons(data = polygons,
-                  weight = 1,
-                  color = "brown",
-                  fillOpacity = 0.2,
-                  popup = popup_content)
-  }
-  
-  if (nrow(points) > 0) {
-    leafletProxy("map") |> 
-      addCircleMarkers(data = points,
-                       lng = ~longitude, 
-                       lat = ~latitude,
-                       opacity = 1, 
-                       fillOpacity = 0.8, 
-                       radius = 2,
-                       popup = popup_content)
-  }
+ map_proxy <- leafletProxy("map") |> 
+  clearMarkers() |> 
+  clearShapes()
+
+if (nrow(polygons) > 0) {
+  map_proxy <- map_proxy |>
+    addPolygons(data = polygons,
+                weight = 1,
+                color = "brown",
+                fillOpacity = 0.2,
+                popup = popup_content)
+}
+
+if (nrow(points) > 0) {
+  map_proxy <- map_proxy |>
+    addCircleMarkers(data = points,
+                     lng = ~longitude, 
+                     lat = ~latitude,
+                     opacity = 1, 
+                     fillOpacity = 0.8, 
+                     radius = 2,
+                     popup = popup_content)
+}
+
 })
 
 
