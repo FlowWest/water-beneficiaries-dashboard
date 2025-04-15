@@ -157,44 +157,52 @@ filtered_dataset <- reactive({
 ```
 
 ```{r}
-observe({ 
+observe({
   req(input$select_bene, input$select_metric)
   
-  tmp_data <- filtered_dataset() |> 
-    filter_by_metric(quantity_metric, input$select_metric) |> 
+  tmp_data <- filtered_dataset() |>
+    filter_by_metric(quantity_metric, input$select_metric) |>
     st_transform(4326)
   
+  if (nrow(tmp_data) == 0) {
+    showNotification("No beneficiaries found for the selected type and forest/watershed.",
+                     type = "warning", duration = 5)
+    leafletProxy("map") |> clearMarkers() |> clearShapes()
+    return()
+    }
   # popup for all beneficiary types - consider adding more fields?
-  popup_content <- ~paste("<strong>Entity Name:</strong>", entity_name, "<br>", "<strong>Address:</strong>", entity_address,
-                          "<br>", "<strong>Quantity:</strong>", quantity_metric, quantity_unit)
-  #TODO consider just doing points, maybe colored by gradient (max water contract?) however some beneficiaries are MULTI-polygons
+  popup_content <- ~paste("<strong>Entity Name:</strong>", entity_name, "<br>", "<strong>Address:</strong>",
+                          entity_address, "<br>", "<strong>Quantity:</strong>", quantity_metric, quantity_unit)
   # split polygons and points for plotting purposes
-  is_polygon <- st_geometry_type(tmp_data) %in% c("POLYGON", "MULTIPOLYGON") 
-  polygons <- tmp_data[is_polygon, ]
+  is_polygon <- st_geometry_type(tmp_data) %in% c("POLYGON", "MULTIPOLYGON")
+  polygons_centroid <- tmp_data[is_polygon, ] |> st_centroid()
   points <- tmp_data[!is_polygon, ]
+
+  all_points <- rbind(points, polygons_centroid)
+
+  coords <- st_coordinates(all_points)
+  all_points$longitude <- coords[, 1]
+  all_points$latitude <- coords[, 2]
+  all_points <- all_points |> filter(!is.na(longitude), !is.na(latitude))
   
-  map_proxy <- leafletProxy("map") |> 
-    clearMarkers() |> 
-    clearShapes()
+  if (nrow(all_points) == 0) {
+    showNotification("There are no valid locations for the selected data.", #TODO think about language of message
+                     type = "warning", duration = 5)
+    leafletProxy("map") |> clearMarkers() |> clearShapes()
+    return()
+    }
   
-  if (nrow(polygons) > 0) {
-    map_proxy <- map_proxy |>
-      addPolygons(data = polygons,
-                  weight = 1,
-                  color = "brown",
-                  fillOpacity = 0.2,
-                  popup = popup_content)
-    }
-  if (nrow(points) > 0) {
-    map_proxy <- map_proxy |>
-      addCircleMarkers(data = points,
-                       lng = ~longitude, 
-                       lat = ~latitude,
-                       opacity = 1, 
-                       fillOpacity = 0.8, 
-                       radius = 2,
-                       popup = popup_content)
-    }
+  # Draw map
+  leafletProxy("map") |>
+    clearMarkers() |>
+    clearShapes() |>
+    addCircleMarkers(data = all_points,
+                     lng = ~longitude,
+                     lat = ~latitude,
+                     radius = 3,
+                     color = "brown",
+                     fillOpacity = 0.8,
+                     popup = popup_content)
   })
 
 observe({
@@ -219,7 +227,6 @@ observe({
                                   popup = ~name)
     }
   })
-
 leafletOutput("map", height = "600px")
 
 ```
