@@ -20,11 +20,15 @@ cvp_coords <- st_coordinates(cvp_centroids)
 cvp$longitude <- cvp_coords[,1]
 cvp$latitude <- cvp_coords[,2]
 
+# cross-checked quantity_metric == NA data entry with raw data - quantity entry
+# is already accounted for (Pajaro Valley WMA, Westlands WD) in Pajaro Valley WMA, Santa Clara VWDv - therefore, we are removing it
 cvp <- cvp |>
   st_set_crs(4326) |>
   st_transform(4326) |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
-         national_forest_connection, latitude, longitude, geometry)
+         national_forest_connection, latitude, longitude, geometry) |>
+  filter(!is.na(quantity_metric)) |>
+  glimpse()
 
 # swp
 swp <- readRDS(here::here("data", "swp.RDS"))
