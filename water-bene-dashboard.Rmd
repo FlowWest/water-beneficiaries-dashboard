@@ -283,3 +283,27 @@ output$catalog <- renderDT({
 ```
 
 ### Summary
+
+```{r}
+plotOutput("summary_plot")
+```
+
+```{r}
+output$summary_plot <- renderPlot({
+  req(input$select_bene, input$select_metric)
+  
+  tmp_data <- filtered_dataset() |>
+    filter_by_metric(quantity_metric, input$select_metric) |>
+    st_drop_geometry()
+  if (nrow(tmp_data) == 0) {
+    return(NULL)
+    }
+  ggplot(tmp_data, aes(x = beneficiary_type, y = quantity_metric, fill = beneficiary_type)) +
+    geom_col() +
+    theme_minimal() +
+    labs(title = "Total Quantity by Beneficiary Type", x = "Beneficiary Type", y = "Total Quantity") +
+    theme(legend.position = "none")
+  })
+
+```
+
