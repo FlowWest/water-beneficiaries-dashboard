@@ -45,9 +45,11 @@ swp <- swp |>
          national_forest_connection, latitude, longitude, geometry)
 
 # binding all datasets ----------------------------------------------------
-all_datasets_raw <- bind_rows(hydropower, cvp, swp)
+all_datasets_raw <- bind_rows(hydropower, cvp, swp) |>
+  st_make_valid()
 
 # processing to find NF relationship --------------------------------------
+   # part 1 ------
 # opening boundaries
 nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS")) |>
   st_transform(4326) |>
@@ -57,7 +59,7 @@ watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
   st_make_valid()
 
 #joining all datasets with watersheds
-all_datasets_watershed <- st_join(all_datasets, watersheds, left = TRUE) |> glimpse()
+all_datasets_watershed <- st_join(all_datasets_raw, watersheds, left = TRUE) |> glimpse()
 
 # keeping only the name field for nf
 nf_keys <- nf_boundaries[, c("name")]
@@ -69,7 +71,7 @@ nf_boundaries <- nf_boundaries |> # renaming to differentiate
   rename(nf_name = name)
 
 # assign overlap watershed to datasets
-all_datasets_with_ws <- st_join(all_datasets, watersheds, left = TRUE)
+all_datasets_with_ws <- st_join(all_datasets_raw, watersheds, left = TRUE)
 # assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
 watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
   st_drop_geometry() |>
@@ -89,6 +91,11 @@ all_datasets_results <- left_join(all_datasets_with_ws, watershed_nf, by = "wate
   select(-national_forest_connection) |>
   rename(national_forest_connection = nf_name) |>
   glimpse()
+
+#TODO I think all other contractors that do not relate spatially to any of the NF, they should b
+# related to the NF that fall within the Lower Sacramento Watershed, since this is where the
+# SWP comes from. Check if this is the case, or if any other watershed makes more sense
+# for CVP
 
 # splitting points and polygons for plotting purposes
 geom_types <- st_geometry_type(all_datasets_results)
