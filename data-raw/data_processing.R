@@ -44,13 +44,107 @@ swp <- swp |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
+# binding all datasets ----------------------------------------------------
+all_datasets_raw <- bind_rows(hydropower, cvp, swp)
+
+# processing to find NF relationship --------------------------------------
+# opening boundaries
+nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS")) |>
+  st_transform(4326) |>
+  st_make_valid()
+watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
+  st_transform(4326) |>
+  st_make_valid()
+
+#joining all datasets with watersheds
+all_datasets_watershed <- st_join(all_datasets, watersheds, left = TRUE) |> glimpse()
+
+# keeping only the name field for nf
+nf_keys <- nf_boundaries[, c("name")]
+
+watersheds <- watersheds |> # renaming to differentiate
+  rename(watershed_name = name)
+
+nf_boundaries <- nf_boundaries |> # renaming to differentiate
+  rename(nf_name = name)
+
+# assign overlap watershed to datasets
+all_datasets_with_ws <- st_join(all_datasets, watersheds, left = TRUE)
+# assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
+watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
+  st_drop_geometry() |>
+  distinct(watershed_name, nf_name) |>
+  glimpse()
+
+# keep this for now, may use for tabular data?
+# watershed_nf_lookup <- watershed_nf_lookup |>
+#   st_drop_geometry() |>
+#   group_by(watershed_name) |>
+#   summarise(nf = paste(unique(nf_name), collapse = ", ")) |>
+#   glimpse()
+
+
+# joining to find dataset-nf relationship, add geometry from original all_datasets
+all_datasets_results <- left_join(all_datasets_with_ws, watershed_nf, by = "watershed_name") |>
+  select(-national_forest_connection) |>
+  rename(national_forest_connection = nf_name) |>
+  glimpse()
+
+# splitting points and polygons for plotting purposes
+geom_types <- st_geometry_type(all_datasets_results)
+result_points <- all_datasets_results[geom_types %in% c("POINT", "MULTIPOINT"), ]
+result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
 
 # save dataset ------------------------------------------------------------
-
-all_datasets <- bind_rows(hydropower, cvp, swp)
+saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
 
 
 # map datasets to NF and HUCs ---------------------------------------------
 # TODO: explore ways of clipping the data to the HUCs
 
 saveRDS(all_datasets, here::here("data", "all_datasets.RDS"))
+
+# PLOTS -------------------------------------------------------------------
+# plotting both nf and watersheds, plus all_datasets to check accuracy---
+leaflet() |>
+  addTiles() |>
+  addPolygons(data = nf_boundaries,
+              group = "National Forests",
+              color = "blue",
+              weight = 1,
+              fillOpacity = 0.3,
+              popup = ~nf_name) |>
+  addPolygons(data = watersheds,
+              group = "Watersheds",
+              color = "green",
+              weight = 1,
+              fillOpacity = 0.3,
+              popup = ~watershed_name) |>
+  # point beneficiaries
+  addCircleMarkers(data = result_points,
+                   group = "Beneficiaries (Points)",
+                   radius = 5,
+                   color = "red",
+                   stroke = FALSE,
+                   fillOpacity = 0.7,
+                   popup = ~paste(
+                     "<strong>Entity Name:</strong>", entity_name,
+                     "<br><strong>Beneficiary Type:</strong>", beneficiary_type,
+                     "<br><strong>Watershed:</strong>", watershed_name,
+                     "<br><strong>National Forest:</strong>", national_forest_connection)) |>
+  # polygon-based beneficiaries
+  addPolygons(data = result_polygons,
+              group = "Beneficiaries (Polygons)",
+              color = "orange",
+              weight = 1,
+              fillOpacity = 0.5,
+              popup = ~paste(
+                "<strong>Beneficiary Type:</strong>", beneficiary_type,
+                "<br><strong>Entity Name:</strong>", entity_name,
+                "<br><strong>Watershed:</strong>", watershed_name,
+                "<br><strong>National Forest:</strong>", national_forest_connection)) |>
+  addLayersControl(
+    overlayGroups = c("National Forests", "Watersheds",
+                      "Beneficiaries (Points)", "Beneficiaries (Polygons)"),
+    options = layersControlOptions(collapsed = FALSE))
+

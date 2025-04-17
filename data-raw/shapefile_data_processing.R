@@ -14,24 +14,13 @@ nf_raw <- read_sf(here::here('data-raw', 'shapefiles', 'nf_boundaries', 'S_USA.N
 
 unique(nf_bounds$nfslandu_2)
 
-names <- c('Angeles National Forest',
-           'Cleveland National Forest',
-           'Eldorado National Forest',
-           'Inyo National Forest',
-           'Klamath National Forest',
-           'Tahoe National Forest',
+names <- c('Klamath National Forest',
            'Lassen National Forest',
-           'Los Padres National Forest',
            'Mendocino National Forest',
-           'Plumas National Forest',
-           'San Bernardino National Forest',
-           'Sequoia National Forest',
            'Shasta National Forest',
-           'Trinity National Forest',
-           'Sierra National Forest',
            'Modoc National Forest',
-           'Six Rivers National Forest',
-           'Stanislaus National Forest')
+           'Six Rivers National Forest')
+
 
 nf_bounds <- nf_raw |>
   filter(nfslandu_2 %in% names) |>
@@ -78,132 +67,3 @@ huc6 <- bind_rows(huc6_cv,
                   huc6_klamath)
 
 saveRDS(huc6, here::here("data", "watersheds.RDS"))
-
-
-# testing ways to find the overlap to assign NF to a beneficiary
-
-nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS")) |>
-  st_transform(4326) |>
-  st_make_valid()
-watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
-  st_transform(4326) |>
-  st_make_valid()
-all_datasets <- readRDS(here::here("data", "all_datasets.RDS")) |>
-  st_make_valid()
-
-# approach 1 ---
-
-# all_datasets_with_watershed <- st_join(all_datasets, watersheds, left = FALSE) |>
-#   glimpse()
-#
-# watersheds_with_nf <- st_join(watersheds, nf_boundaries, left = FALSE)
-#
-# all_data_full <- st_join(all_datasets_with_watershed, watersheds_with_nf, left = TRUE)
-
-# approach 2 --
-
-#joining all datasets with watersheds
-all_datasets_watershed <- st_join(all_datasets, watersheds, left = TRUE) |> glimpse()
-
-# keeping only the name field for nf
-nf_keys <- nf_boundaries[, c("name")]
-
-# # joining dataset with watershed and nf names, based on geometry
-# watershed_nf_lookup <- st_join(watersheds, nf_keys, left = TRUE)
-#
-# watershed_nf <- watershed_nf_lookup |>
-#   st_drop_geometry() |>
-#   distinct(huc6, .keep_all = TRUE)  # avoiding duplicates
-#
-# all_datasets_results <- left_join(all_datasets_watershed, watershed_nf, by = "huc6") |>
-#   st_transform(4326) |>
-#   rename(watershed = name.x,
-#          nf = name.y) |>
-#   glimpse()
-#
-# # split points and polygons for plotting purposes
-#
-# geom_types <- st_geometry_type(all_datasets_results)
-#
-# # Separate point and polygon features
-# result_points <- all_datasets_results[geom_types %in% c("POINT", "MULTIPOINT"), ]
-# result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
-
-
-# approach 3 ---
-watersheds <- watersheds |>
-  rename(watershed_name = name)
-
-nf_boundaries <- nf_boundaries |>
-  rename(nf_name = name)
-
-# assign overlap watershed to datasets
-all_datasets_with_ws <- st_join(all_datasets, watersheds, left = TRUE)
-# assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
-watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
-  st_drop_geometry() |>
-  distinct(watershed_name, nf_name) |>
-  glimpse()
-
-# keep this for now, may use for tabular data?
-# watershed_nf_lookup <- watershed_nf_lookup |>
-#   st_drop_geometry() |>
-#   group_by(watershed_name) |>
-#   summarise(nf = paste(unique(nf_name), collapse = ", ")) |>
-#   glimpse()
-
-# join to find dataset-nf relationship, add geometry from original all_datasets
-all_datasets_results <- left_join(all_datasets_with_ws, watershed_nf, by = "watershed_name") |>
-  select(-national_forest_connection) |>
-  rename(national_forest_connection = nf_name) |>
-  glimpse()
-
-# split points and polygons for plotting purposes
-geom_types <- st_geometry_type(all_datasets_results)
-result_points <- all_datasets_results[geom_types %in% c("POINT", "MULTIPOINT"), ]
-result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
-
-# save data
-saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
-
-# plotting both nf and watersheds, plus all_datasets to check accuracy---
-leaflet() |>
-  addTiles() |>
-  addPolygons(data = nf_boundaries,
-              group = "National Forests",
-              color = "blue",
-              weight = 1,
-              fillOpacity = 0.3,
-              popup = ~nf_name) |>
-  addPolygons(data = watersheds,
-              group = "Watersheds",
-              color = "green",
-              weight = 1,
-              fillOpacity = 0.3,
-              popup = ~watershed_name) |>
-  # point beneficiaries
-  addCircleMarkers(data = result_points,
-                   group = "Beneficiaries (Points)",
-                   radius = 5,
-                   color = "red",
-                   stroke = FALSE,
-                   fillOpacity = 0.7,
-                   popup = ~paste(
-                     "<strong>Beneficiary Type:</strong>", beneficiary_type,
-                     "<br><strong>Watershed:</strong>", watershed_name,
-                     "<br><strong>National Forest:</strong>", national_forest_connection)) |>
-  # polygon-based beneficiaries
-  addPolygons(data = result_polygons,
-              group = "Beneficiaries (Polygons)",
-              color = "orange",
-              weight = 1,
-              fillOpacity = 0.5,
-              popup = ~paste(
-                "<strong>Beneficiary Type:</strong>", beneficiary_type,
-                "<br><strong>Watershed:</strong>", watershed_name,
-                "<br><strong>National Forest:</strong>", national_forest_connection)) |>
-  addLayersControl(
-    overlayGroups = c("National Forests", "Watersheds",
-                      "Beneficiaries (Points)", "Beneficiaries (Polygons)"),
-    options = layersControlOptions(collapsed = FALSE))
-
