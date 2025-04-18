@@ -94,15 +94,25 @@ ewrims_top10 |>
 
 ```{r}
 ewrims_clean <- ewrims_pod |> 
-  mutate(beneficiary_type = "Water Rights") |> 
+  mutate(FACE_VALUE_OR_REPORTED_VALUE = round(FACE_VALUE_OR_REPORTED_VALUE, 0)) |> 
+  filter(FACE_VALUE_OR_REPORTED_VALUE > 0) |> 
+  mutate(beneficiary_type = "Water right owner") |> 
   mutate(quantity_unit = "acre-feet") |> 
-  select(beneficiary_type, entity_name = PARCEL_NUMBER, 
-         entitity_contact = PRIMARY_OWNER_NAME,
-         latitude = LATITUDE, longitude = LONGITUDE,
-         quantity_metric = FACE_VALUE_OR_REPORTED_VALUE, quantity_unit,
+  select(beneficiary_type, 
+         entity_name = PRIMARY_OWNER_NAME, , 
+         entitity_contact = APPL_ID,
+         latitude = LATITUDE, 
+         longitude = LONGITUDE,
+         quantity_metric = FACE_VALUE_OR_REPORTED_VALUE, 
+         quantity_unit,
          geometry = SHAPE, 
          entity_address = HU_12_NAME) |> # unsure if we want this for the address, but it's the closest I can think of   
+  mutate(entitity_contact = paste0("Parcel Number: ", entitity_contact)) |> 
   glimpse()
+
+# TODO: do we want to limit the water rights since there are so many and small (median 48)
+ggplot(ewrims_clean, aes(x = quantity_metric)) + 
+  geom_histogram(bins = 30)
 
 saveRDS(ewrims_clean, here::here("data-raw", "water_rights_clean.RDS"))
 
