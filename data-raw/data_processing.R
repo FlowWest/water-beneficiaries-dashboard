@@ -4,7 +4,6 @@
 library(tidyverse)
 library(sf)
 
-
 # load in datasets --------------------------------------------------------
 
 # hydropower
@@ -44,8 +43,12 @@ swp <- swp |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
+# water rights
+water_rights <- readRDS('data-raw/water_rights_clean.RDS') |>
+  st_transform(4326)
+
 # binding all datasets ----------------------------------------------------
-all_datasets_raw <- bind_rows(hydropower, cvp, swp) |>
+all_datasets_raw <- bind_rows(hydropower, cvp, swp, water_rights) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
@@ -109,7 +112,7 @@ saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
 # map datasets to NF and HUCs ---------------------------------------------
 # TODO: explore ways of clipping the data to the HUCs
 
-saveRDS(all_datasets, here::here("data", "all_datasets.RDS"))
+saveRDS(all_datasets_raw, here::here("data", "all_datasets.RDS"))
 
 # PLOTS -------------------------------------------------------------------
 # plotting both nf and watersheds, plus all_datasets to check accuracy---
