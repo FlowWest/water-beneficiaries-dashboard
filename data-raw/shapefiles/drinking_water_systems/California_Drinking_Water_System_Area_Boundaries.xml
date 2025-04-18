@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+    <idinfo>
+        <citation>
+            <citeinfo>
+                <title>California Drinking Water System Area Boundaries</title>
+            </citeinfo>
+        </citation>
+        <descript>
+            <abstract>In order to provide an accurate data set of service area boundaries for California drinking water systems, the Division of Drinking Water of the California Water Resources Control Board (SWRCB DDW) has undertaken a project to vet and verify the data collected by the Tracking California's Water Boundary Tool (WBT).SWRCB DDW downloaded a copy of the current water system service areas loaded in the WBT as of June 27, 2019. Additional attribute fields indicating verification status, verification staff and system type were appended to the data set. SWRCB DDW staff are reviewing and validating the displayed boundaries of each service area as well as contacting the service providers regarding necessary corrections. The verification status of any particular service area may be found in the Verification Status field.Note: This feature layer is updated on a regular
+basis. However, in some locations where it is shared, it shows the “Data
+Updated” date as the last time the item has changed, not the data. To
+accurately determine when the data was last updated, open the data table and
+sort by Last Edited Date field.For any questions regarding this dataset, please contact the Data Support Unit at DDW-DSU@waterboards.ca.gov.</abstract>
+            <purpose>Service area boundaries of drinking water service providers, as verified by the Division of Drinking Water, State Water Resources Control Board.</purpose>
+        </descript>
+        <keywords>
+            <theme>
+                <themekt>None</themekt>
+                <themekey>drinking water</themekey>
+                <themekey>administrative boundaries</themekey>
+                <themekey>service areas</themekey>
+                <themekey>jurisdictional boundaries</themekey>
+                <themekey>CAOpenData</themekey>
+                <themekey>SWRCB</themekey>
+                <themekey>CA</themekey>
+                <themekey>State Water Resources Control Board</themekey>
+            </theme>
+        </keywords>
+        <accconst>None</accconst>
+        <useconst>Please note that the service areas may change without notice as the data set is dynamic and updated on an on-going basis.</useconst>
+        <datacred>Division of Drinking Water, California Water Resources Control Board, Tracking California, Public Health Institute Water Boundary Tool</datacred>
+    </idinfo>
+    <metainfo>
+        <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+        <metstdv>FGDC-STD-001-1998</metstdv>
+        <mettc>local time</mettc>
+    </metainfo>
+</metadata>
