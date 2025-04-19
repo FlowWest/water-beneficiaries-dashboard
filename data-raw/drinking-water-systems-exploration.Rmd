@@ -30,7 +30,8 @@ This markdown will only pull the [Drinking water system area boundaries](https:/
 ```{r include=FALSE}
 # drinking water system boundaries #############################################
 dw_system_boundaries <- st_read("data-raw/shapefiles/drinking_water_systems/California_Drinking_Water_System_Area_Boundaries.shp") |> 
-  st_transform(crs = "+proj=longlat +datum=WGS84")
+  st_transform(crs = "+proj=longlat +datum=WGS84") |> 
+  clean_names()
 ```
 
 
@@ -43,27 +44,63 @@ leaflet(dw_system_boundaries) |>
 
 ```{r echo=FALSE}
 # reading watersheds to clip dws
-watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
-  st_make_valid() |> 
-  st_transform(4326)  
+# watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
+#   st_make_valid() |> 
+#   st_transform(4326)  
+# 
+# dw_system_boundaries <- dw_system_boundaries |>
+#   st_make_valid() |> 
+#   st_transform(4326)
+# 
+# # clipping drinking water systems to watersheds of interest
+# dws_norcal <- st_intersects(dw_system_boundaries, watersheds)
+# dws_norcal_sf <- dw_system_boundaries[selected, ]
+# 
+# dws<- dws_norcal_sf |> 
+#   mutate(beneficiary_type = "drinking water system",
+#          national_forest_connection = NA,
+#          entity_name = WATER_SY_1,
+#          entity_address = ADDR_LINE_,
+#          entity_contact = AC_PHONE_N,
+#          quantity_metric = NA,
+#          quantity_unit = NA) |> 
+#   select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |> 
+#   glimpse()
+# 
+# # plotting
+# leaflet(dws) |>
+#   addTiles() |>
+#   addPolygons()
 
+```
+
+```{r}
 dw_system_boundaries <- dw_system_boundaries |>
-  st_make_valid() |> 
+  st_make_valid() |>
   st_transform(4326)
+dw_system_boundaries <- st_centroid(dw_system_boundaries)
 
-# clipping drinking water systems to watersheds of interest
-dws_norcal <- st_intersects(dw_system_boundaries, watersheds)
-dws_norcal_sf <- dw_system_boundaries[selected, ]
-
-# Now you can plot it
-leaflet(dws_norcal_sf) |>
+leaflet(dw_system_boundaries) |>
   addTiles() |>
-  addPolygons()
+  addCircles()
 
+```
+
+```{r}
+dws<- dw_system_boundaries |>
+  mutate(beneficiary_type = "drinking water system",
+         national_forest_connection = NA,
+         entity_name = water_syst,
+         entity_address = addr_line,
+         entity_contact = ac_phone_n,
+         quantity_metric = NA,
+         quantity_unit = NA) |>
+  select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |>
+  glimpse()
 ```
 
 Save RDS
 ```{r}
-saveRDS(dws_norcal_sf, here::here('data', 'drinking_water_boundaries.RDS'))
+saveRDS(dws, here::here('data', 'drinking_water_boundaries.RDS'))
 ```
 

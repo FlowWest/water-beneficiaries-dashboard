@@ -25,7 +25,7 @@ cvp$latitude <- cvp_coords[,2]
 cvp <- cvp |>
   st_set_crs(4326) |>
   st_transform(4326) |>
-  select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
+  select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry) |>
   filter(!is.na(quantity_metric)) |>
   glimpse()
@@ -38,14 +38,30 @@ swp_coords <- st_coordinates(swp_centroids)
 swp$longitude <- swp_coords[,1]
 swp$latitude <- swp_coords[,2]
 
+is_polygon <- st_geometry_type(swp) %in% c("POLYGON", "MULTIPOLYGON")
+polygons_centroid <- swp[is_polygon, ] |> st_centroid()
+points <- swp[!is_polygon, ]
+
+
 swp <- swp |>
   st_set_crs(4326) |>
   st_transform(4326) |>
-  select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit,
+  select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
+# drinking water
+dws <- readRDS(here::here("data", "drinking_water_boundaries.RDS"))
+dws <- st_make_valid(dws)
+dws_centroids <- st_centroid(dws)
+dws_coords <- st_coordinates(dws_centroids)
+dws$longitude <- dws_coords[,1]
+dws$latitude <- dws_coords[,2]
+
+dws <- dws |>
+select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
+       national_forest_connection, latitude, longitude, geometry)
 # binding all datasets ----------------------------------------------------
-all_datasets_raw <- bind_rows(hydropower, cvp, swp) |>
+all_datasets_raw <- bind_rows(hydropower, cvp, swp, dws) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
