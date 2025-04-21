@@ -19,7 +19,7 @@ library(viridis)
 
 ```{r}
 # read in processed data
-nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
+nf_boundariesies <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 
 # all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
@@ -87,7 +87,8 @@ selectInput(
               "Public water system" = "pws",
               "Hydropower facility" = "hydropower",
               "Agricultural landowner" = "ag",
-              "Business owner" = "business"),
+              "Business owner" = "business",
+              "Drinking water system" = "dws"),
   selected = "all"
 )
 
@@ -150,6 +151,7 @@ filtered_dataset <- reactive({
       input$select_bene == "ag" ~ "Agricultural landowner",
       input$select_bene == "business" ~ "Business owner",
       input$select_bene == "water_right" ~ "Water right owner",
+      input$select_bene == "dws" ~ "drinking water system",
       TRUE ~ NA_character_
     )
     data <- data |> filter(beneficiary_type == bene_type)

@@ -1,0 +1,106 @@
+---
+title: "Data Exploration - CA Drinking Water Systems "
+author: "Badhia Yunes Katz / Ashley Vizek"
+date: "April 18, 2025"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width=15, fig.height=10)
+library(leaflet)
+library(sf)
+library(tidyverse)
+```
+
+# Summary
+
+There are 4 relevant datasets to understanding public water systems:
+
+1. [Drinking water system area boundaries](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc)
+
+2. [Drinking water source facility locations](https://data.cnra.ca.gov/dataset/urban-water-data-drought/resource/9688aeb1-6c77-44aa-9cf7-6b1c1306f399).
+
+3. [Water supply and demand](https://data.ca.gov/dataset/drinking-water-public-water-system-annually-reported-water-production-and-delivery-information-2013/resource/ddac281d-4f71-45ba-99bd-394fa33d0e58).
+
+4. [Urban water retailer demand](https://data.ca.gov/dataset/urws-conservation-supply-demand).
+
+# Overview 
+
+This markdown will only pull the [Drinking water system area boundaries](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc) data, to do initial National Forest relationship 
+
+```{r include=FALSE}
+# drinking water system boundaries #############################################
+dw_system_boundaries <- st_read("data-raw/shapefiles/drinking_water_systems/California_Drinking_Water_System_Area_Boundaries.shp") |> 
+  st_transform(crs = "+proj=longlat +datum=WGS84") |> 
+  clean_names()
+```
+
+
+```{r eval=FALSE, include=FALSE}
+leaflet(dw_system_boundaries) |>
+  addTiles() |>
+  addPolygons()
+```
+
+
+```{r echo=FALSE}
+# reading watersheds to clip dws
+# watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
+#   st_make_valid() |> 
+#   st_transform(4326)  
+# 
+# dw_system_boundaries <- dw_system_boundaries |>
+#   st_make_valid() |> 
+#   st_transform(4326)
+# 
+# # clipping drinking water systems to watersheds of interest
+# dws_norcal <- st_intersects(dw_system_boundaries, watersheds)
+# dws_norcal_sf <- dw_system_boundaries[selected, ]
+# 
+# dws<- dws_norcal_sf |> 
+#   mutate(beneficiary_type = "drinking water system",
+#          national_forest_connection = NA,
+#          entity_name = WATER_SY_1,
+#          entity_address = ADDR_LINE_,
+#          entity_contact = AC_PHONE_N,
+#          quantity_metric = NA,
+#          quantity_unit = NA) |> 
+#   select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |> 
+#   glimpse()
+# 
+# # plotting
+# leaflet(dws) |>
+#   addTiles() |>
+#   addPolygons()
+
+```
+
+```{r}
+dw_system_boundaries <- dw_system_boundaries |>
+  st_make_valid() |>
+  st_transform(4326)
+dw_system_boundaries <- st_centroid(dw_system_boundaries)
+
+leaflet(dw_system_boundaries) |>
+  addTiles() |>
+  addCircles()
+
+```
+
+```{r}
+dws<- dw_system_boundaries |>
+  mutate(beneficiary_type = "drinking water system",
+         national_forest_connection = NA,
+         entity_name = water_syst,
+         entity_address = addr_line,
+         entity_contact = ac_phone_n,
+         quantity_metric = NA,
+         quantity_unit = NA) |>
+  select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |>
+  glimpse()
+```
+
+Save RDS
+```{r}
+saveRDS(dws, here::here('data', 'drinking_water_boundaries.RDS'))
+```
+
