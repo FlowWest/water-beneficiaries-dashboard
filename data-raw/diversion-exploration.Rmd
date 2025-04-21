@@ -114,6 +114,8 @@ ewrims_clean <- ewrims_pod |>
 ggplot(ewrims_clean, aes(x = quantity_metric)) + 
   geom_histogram(bins = 30)
 
+summary(ewrims_clean$quantity_metric)
+
 saveRDS(ewrims_clean, here::here("data-raw", "water_rights_clean.RDS"))
 
 ```

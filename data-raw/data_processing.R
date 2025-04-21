@@ -48,14 +48,11 @@ swp <- swp |>
   select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
-<<<<<<< HEAD
+
 # water rights
 water_rights <- readRDS('data-raw/water_rights_clean.RDS') |>
   st_transform(4326)
 
-# binding all datasets ----------------------------------------------------
-all_datasets_raw <- bind_rows(hydropower, cvp, swp, water_rights) |>
-=======
 # drinking water
 dws <- readRDS(here::here("data", "drinking_water_boundaries.RDS"))
 dws <- st_make_valid(dws)
@@ -68,8 +65,7 @@ dws <- dws |>
 select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
        national_forest_connection, latitude, longitude, geometry)
 # binding all datasets ----------------------------------------------------
-all_datasets_raw <- bind_rows(hydropower, cvp, swp, dws) |>
->>>>>>> 85ea91277c402ce0d50683c17be1fe8951617adf
+all_datasets_raw <- bind_rows(hydropower, cvp, swp, dws, water_rights) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
