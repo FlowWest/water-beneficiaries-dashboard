@@ -19,7 +19,7 @@ library(viridis)
 
 ```{r}
 # read in processed data
-nf_boundariesies <- readRDS(here::here("data", "nf_boundaries.RDS"))
+nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 
 # all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
