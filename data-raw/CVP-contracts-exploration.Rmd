@@ -111,6 +111,7 @@ ggplot(cvp_units_totals, aes(x = reorder(unit, -total), y = total)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+unique(cvp_1$unit)
 ```
 
 
@@ -530,9 +531,10 @@ cvp <- cvp_w_locations_2 |>
          entity_address = NA,
          entity_contact = NA,
          quantity_metric = maximum_contract_quantity,
-         quantity_unit = "maximum contract quantity") |> 
+         quantity_unit = "maximum contract quantity",
+         cvp_unit_name = unit) |> # keeping unit name for now, this field will be used to assign nf
   select(beneficiary_type, national_forest_connection, entity_name, entity_address,
-         entity_contact, quantity_metric, quantity_unit) |> 
+         entity_contact, quantity_metric, quantity_unit, cvp_unit_name) |> 
   glimpse()
 
 ```
