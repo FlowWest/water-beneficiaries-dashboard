@@ -25,7 +25,6 @@ names <- c('Klamath National Forest',
 nf_bounds <- nf_raw |>
   filter(nfslandu_2 %in% names) |>
   select(name = nfslandu_2, hq_location = hq_locatio, geometry) |>
-  mutate(name = ifelse(name == "Shasta National Forest", "Shasta-Trinity National Forest", name)) |>
   st_transform("+proj=longlat +datum=WGS84") |>
   glimpse()
 

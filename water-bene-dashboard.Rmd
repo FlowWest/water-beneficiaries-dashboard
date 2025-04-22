@@ -21,7 +21,6 @@ library(viridis)
 # read in processed data
 nf_boundariesies <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
-hydropower <- readRDS(here::here("data", "hydropower.RDS")) #TODO: placeholder
 
 # all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
 all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS"))
@@ -96,7 +95,8 @@ selectInput(
 radioButtons(
   inputId = "select_metric",
   label = tags$strong("Select a metric to filter beneficiaries"),
-  choices = c("None", "Top 10%", "Top 25%")
+  choices = c("Top 10%", "Top 25%", "None"),
+  selected = "None"
 )
 
 checkboxGroupInput(
@@ -143,7 +143,7 @@ filtered_dataset <- reactive({
   data <- all_datasets
 
   if (input$select_bene != "all") {
-    bene_type <- case_when(
+    bene_type <- case_when( # TODO: let's make these all the same capitalization format 
       input$select_bene == "hydropower" ~ "hydropower facility",
       input$select_bene == "cvp" ~ "cvp contractor",
       input$select_bene == "swp" ~ "swp contractor",
