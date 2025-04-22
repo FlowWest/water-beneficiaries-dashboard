@@ -30,6 +30,8 @@ cvp <- cvp |>
   filter(!is.na(quantity_metric)) |>
   glimpse()
 
+# TODO processing cvp since it requires manual adjustments
+
 # swp
 swp <- readRDS(here::here("data", "swp.RDS"))
 swp <- st_make_valid(swp)
@@ -170,4 +172,41 @@ leaflet() |>
     overlayGroups = c("National Forests", "Watersheds",
                       "Beneficiaries (Points)", "Beneficiaries (Polygons)"),
     options = layersControlOptions(collapsed = FALSE))
+
+
+# part 2 ------
+#qc'ing SWP - TODO this are the records that need separate adjustment, the the and criteria needed
+all_datasets_results |>
+  filter(beneficiary_type == "swp contractor" & is.na(national_forest_connection)) |>
+  mutate(national_forest_connection =
+           case_when(is.na(national_forest_connection) & beneficiary_type == "swp contractor" ~ "Lassen National Forest",
+         T ~ national_forest_connection)) |>
+  filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) |>
+  leaflet() |>
+  addTiles() |>
+  addPolygons(color = "orange",
+              weight = 1,
+              fillOpacity = 0.5,
+              popup = ~paste(
+                "<strong>Beneficiary Type:</strong>", beneficiary_type,
+                "<br><strong>Entity Name:</strong>", entity_name,
+                "<br><strong>Watershed:</strong>", watershed_name,
+                "<br><strong>National Forest:</strong>", national_forest_connection))
+# qc' in CVP
+# TODO this are the records that need separate adjustment, use lucid to relate cvp_unit_name to watershed
+all_datasets_results |>
+  filter(beneficiary_type == "cvp contractor" & is.na(national_forest_connection)) |>
+  distinct(entity_name) |>
+  view()
+  # filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) |>
+  # leaflet() |>
+  # addTiles() |>
+  # addPolygons(color = "purple",
+  #             weight = 1,
+  #             fillOpacity = 0.5,
+  #             popup = ~paste(
+  #               "<strong>Beneficiary Type:</strong>", beneficiary_type,
+  #               "<br><strong>Entity Name:</strong>", entity_name,
+  #               "<br><strong>Watershed:</strong>", watershed_name,
+  #               "<br><strong>National Forest:</strong>", national_forest_connection))
 
