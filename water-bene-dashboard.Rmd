@@ -51,8 +51,7 @@ radioButtons(
   inputId = "select_huc_or_nf",
   label = tags$strong("filter by watershed or national forest?"),
   choices = c("Watershed (HUC6)", "National Forest"),
-  selected = "National Forest"
-)
+  selected = "National Forest")
 
 conditionalPanel(
   condition = "input.select_huc_or_nf == 'Watershed (HUC6)'",
@@ -60,9 +59,8 @@ conditionalPanel(
     inputId = 'select_huc',
     label = tags$strong('Select watershed to identify connected benficiaries'),
     choices = c(unique(all_datasets$watershed_name)),
-    selected = "Upper Sacramento" # TODO: placeholder
+    selected = "Upper Sacramento") # TODO: placeholder
   )
-)
 
 conditionalPanel(
   condition = "input.select_huc_or_nf == 'National Forest'",
@@ -73,9 +71,8 @@ conditionalPanel(
     # choices = c("Eldorado National Forest", "Lassen National Forest", "Mendocino National Forest", "Plumas National Forest", 
     #             "Shasta-Trinity National Forest", "Tahoe National Forest", "Trinity National Forest", "Klamath National Forest",
     #             "Modoc National Forest", "Six Rivers National Forest"),
-    selected = "Klamath National Forest"
+    selected = "Klamath National Forest")
   )
-)
 
 selectInput(
   inputId = "select_bene",
@@ -90,7 +87,7 @@ selectInput(
               "Business owner" = "business",
               "Drinking water system" = "dws"),
   selected = "all"
-)
+  )
 
 radioButtons(
   inputId = "select_metric",
@@ -145,13 +142,13 @@ filtered_dataset <- reactive({
   if (input$select_bene != "all") {
     bene_type <- case_when( # TODO: let's make these all the same capitalization format 
       input$select_bene == "hydropower" ~ "hydropower facility",
-      input$select_bene == "cvp" ~ "cvp contractor",
-      input$select_bene == "swp" ~ "swp contractor",
+      input$select_bene == "cvp" ~ "CVP contractor",
+      input$select_bene == "swp" ~ "SWP contractor",
       input$select_bene == "pws" ~ "Public water system",
       input$select_bene == "ag" ~ "Agricultural landowner",
       input$select_bene == "business" ~ "Business owner",
       input$select_bene == "water_right" ~ "Water right owner",
-      input$select_bene == "dws" ~ "drinking water system",
+      input$select_bene == "dws" ~ "Drinking water system",
       TRUE ~ NA_character_
     )
     data <- data |> filter(beneficiary_type == bene_type)
@@ -264,24 +261,43 @@ leafletOutput("map", height = "600px")
 ### Catalog 
 
 ```{r}
-DTOutput("catalog")
+div(downloadButton("download_catalog", "Download Catalog Selection")
+    )
+div(style = "height: 720px; overflow-y: auto;",
+    DTOutput("catalog")
+    )
 ```
 
 ```{r}
 output$catalog <- renderDT({
   req(input$select_bene, input$select_metric)
-  
+
   tmp_data <- filtered_dataset() |>
     filter_by_metric(quantity_metric, input$select_metric) |>
-    st_drop_geometry()  
-  
+    st_drop_geometry()
+
   datatable(tmp_data,
-            options = list(pageLength = 10,
-                           searching = TRUE,
-                           ordering = TRUE)
+            options = list(
+              pageLength = 10,
+              searching = TRUE,
+              ordering = TRUE,
+              paging = TRUE,
+              lengthChange = TRUE)
             )
   })
 
+output$download_catalog <- downloadHandler(
+  filename = function() {
+    paste0("catalog_", Sys.Date(), ".csv")
+  },
+  content = function(file) {
+    tmp_data <- filtered_dataset() |>
+      filter_by_metric(quantity_metric, input$select_metric) |>
+      st_drop_geometry()
+    
+    write.csv(tmp_data, file, row.names = FALSE)
+  }
+)
 ```
 
 ### Summary
