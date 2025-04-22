@@ -96,7 +96,7 @@ radioButtons(
   inputId = "select_metric",
   label = tags$strong("Select a metric to filter beneficiaries"),
   choices = c("Top 10%", "Top 25%", "None"),
-  selected = "Top 10%"
+  selected = "None"
 )
 
 checkboxGroupInput(

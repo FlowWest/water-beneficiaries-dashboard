@@ -110,13 +110,20 @@ ewrims_clean <- ewrims_pod |>
   mutate(entitity_contact = paste0("Parcel Number: ", entitity_contact)) |> 
   glimpse()
 
-# TODO: do we want to limit the water rights since there are so many and small (median 48)
+# We want to limit the water rights since there are so many and small (median 48)
 ggplot(ewrims_clean, aes(x = quantity_metric)) + 
-  geom_histogram(bins = 30)
+  geom_histogram(bins = 100)
 
 summary(ewrims_clean$quantity_metric)
 
-saveRDS(ewrims_clean, here::here("data-raw", "water_rights_clean.RDS"))
+# NOTE: decided to filter water rights > mean to target most likely beneficiaries
+ewrims_clean_filter <- ewrims_clean |> 
+  filter(quantity_metric > mean(quantity_metric))
+
+ggplot(ewrims_clean_filter, aes(x = quantity_metric)) + 
+  geom_histogram(bins = 100)
+
+saveRDS(ewrims_clean_filter, here::here("data-raw", "water_rights_clean.RDS"))
 
 ```
 
