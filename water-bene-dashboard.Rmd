@@ -23,7 +23,7 @@ nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 
 # all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
-all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS"))
+all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS")) 
 ```
 
 ```{r}
@@ -198,7 +198,8 @@ observe({
   polygons_centroid <- tmp_data[is_polygon, ] |> st_centroid()
   points <- tmp_data[!is_polygon, ]
 
-  all_points <- rbind(points, polygons_centroid)
+  all_points <- rbind(points, polygons_centroid) |> 
+    st_cast("POINT") 
 
   coords <- st_coordinates(all_points)
   all_points$longitude <- coords[, 1]

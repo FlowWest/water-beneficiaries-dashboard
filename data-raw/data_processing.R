@@ -5,13 +5,29 @@ library(tidyverse)
 library(sf)
 
 # load in datasets --------------------------------------------------------
+# opening boundaries
+nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS")) |>
+  st_transform(4326) |>
+  st_make_valid()
+watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
+  st_transform(4326) |>
+  st_make_valid()
+
+# keeping only the name field for nf
+nf_keys <- nf_boundaries[, c("name")]
+
+watersheds <- watersheds |> # renaming to differentiate
+  rename(watershed_name = name)
+
+nf_boundaries <- nf_boundaries |> # renaming to differentiate
+  rename(nf_name = name)
 
 # hydropower
 hydropower <- readRDS('data-raw/hydropower_clean.RDS') |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit, national_forest_connection, latitude, longitude, geometry) |>
    st_transform(4326)
 
-# cvp
+## cvp ----
 cvp <- readRDS(here::here("data", "cvp.RDS"))
 
 cvp_centroids <- st_centroid(cvp)
@@ -21,17 +37,61 @@ cvp$latitude <- cvp_coords[,2]
 
 # cross-checked quantity_metric == NA data entry with raw data - quantity entry
 # is already accounted for (Pajaro Valley WMA, Westlands WD) in Pajaro Valley WMA, Santa Clara VWDv - therefore, we are removing it
-cvp <- cvp |>
+cvp_raw <- cvp |>
   st_set_crs(4326) |>
   st_transform(4326) |>
-  select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
+  st_make_valid() |>
+  select(cvp_unit_name, beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry) |>
   filter(!is.na(quantity_metric)) |>
   glimpse()
 
-# TODO processing cvp since it requires manual adjustments
+cvp_watershed <- st_join(cvp_raw, watersheds, left = TRUE) |> glimpse()
 
-# swp
+cvp_lookup <- tibble::tribble(
+  ~cvp_unit_name, ~watershed_name,
+  "Shasta Dam & Reservoir", "Upper Sacramento",
+  "Black Butte Dam & Reservoir", "Upper Sacramento",
+  "Tehama-Colusa Canal", "Upper Sacramento",
+  "Corning Canal", "Upper Sacramento",
+  "Colusa Basin Drain", "Lower Sacramento",
+  "Folsom Dam & Reservoir", "Lower Sacramento",
+  "Folsom-South Canal", "Lower Sacramento",
+  "Upper American River", "Lower Sacramento",
+  "Delta-Mendota Canal", "Upper Sacramento",
+  "Delta-Mendota Canal",  "Klamath",
+  "Contra Costa Canal", "Upper Sacramento",
+  "Contra Costa Canal",  "Klamath"
+  # Only including facilities that map to your 4 target basins
+)
+
+
+cvp_watershed_clean <- cvp_watershed |>
+  left_join(cvp_lookup, by = "cvp_unit_name", suffix = c("", "_lookup")) |>
+  mutate(watershed_name = case_when(!is.na(watershed_name) ~ watershed_name,
+                                    is.na(watershed_name) & !is.na(watershed_name_lookup) ~ watershed_name_lookup,  # use lookup
+                                    TRUE ~ NA_character_)
+         ) |>
+  select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
+         national_forest_connection, watershed_name, latitude, longitude, geometry) |>
+  glimpse()
+
+cvp_centroids <- st_centroid(cvp_watershed_clean)
+cvp_coords <- st_coordinates(cvp_centroids)
+cvp_watershed_clean$longitude <- cvp_coords[,1]
+cvp_watershed_clean$latitude <- cvp_coords[,2]
+# the remainin NA's are related to lower basins like san joaquin and tulare - will add nf relationship to all
+# tried adding relationshp to all basins but data becomes significantly larger, it will probably be best to
+# add nf relationship manually. See code below
+
+# cvp_watershed_clean <- cvp_watershed_clean |>
+#   mutate(watershed_name = if_else(
+#     is.na(watershed_name),
+#     list(c("Lower Sacramento", "Upper Sacramento", "Northern California Coastal", "Klamath")),
+#     list(watershed_name))) |>
+#   tidyr::unnest_longer(watershed_name)
+
+## swp ----
 swp <- readRDS(here::here("data", "swp.RDS"))
 swp <- st_make_valid(swp)
 swp_centroids <- st_centroid(swp)
@@ -53,7 +113,12 @@ swp <- swp |>
 
 # water rights
 water_rights <- readRDS('data-raw/water_rights_clean.RDS') |>
+  mutate(beneficiary_type = "water right owner") |>
   st_transform(4326)
+
+water_rights <- st_make_valid(water_rights)
+
+
 
 # drinking water
 dws <- readRDS(here::here("data", "drinking_water_boundaries.RDS"))
@@ -67,33 +132,17 @@ dws <- dws |>
 select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
        national_forest_connection, latitude, longitude, geometry)
 # binding all datasets ----------------------------------------------------
-all_datasets_raw <- bind_rows(hydropower, cvp, swp, dws, water_rights) |>
+all_datasets_raw <- bind_rows(hydropower, swp, dws, water_rights) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
-   # part 1 ------
-# opening boundaries
-nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS")) |>
-  st_transform(4326) |>
-  st_make_valid()
-watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
-  st_transform(4326) |>
-  st_make_valid()
-
-#joining all datasets with watersheds
-all_datasets_watershed <- st_join(all_datasets_raw, watersheds, left = TRUE) |> glimpse()
-
-# keeping only the name field for nf
-nf_keys <- nf_boundaries[, c("name")]
-
-watersheds <- watersheds |> # renaming to differentiate
-  rename(watershed_name = name)
-
-nf_boundaries <- nf_boundaries |> # renaming to differentiate
-  rename(nf_name = name)
 
 # assign overlap watershed to datasets
-all_datasets_with_ws <- st_join(all_datasets_raw, watersheds, left = TRUE)
+all_datasets_watershed <- st_join(all_datasets_raw, watersheds, left = TRUE) |> glimpse()
+
+# bind cvp
+all_datasets_with_ws <- bind_rows(all_datasets_watershed, cvp_watershed_clean)
+
 # assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
 watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
   st_drop_geometry() |>
@@ -109,10 +158,16 @@ watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
 
 
 # joining to find dataset-nf relationship, add geometry from original all_datasets
-all_datasets_results <- left_join(all_datasets_with_ws, watershed_nf, by = "watershed_name") |>
+all_datasets_results_raw <- left_join(all_datasets_with_ws, watershed_nf, by = "watershed_name") |>
   select(-national_forest_connection) |>
   rename(national_forest_connection = nf_name) |>
   glimpse()
+# fixing swp manually
+
+all_datasets_results <- all_datasets_results_raw |>
+  mutate(national_forest_connection =
+           case_when(is.na(national_forest_connection) & beneficiary_type == "swp contractor" ~ "Lassen National Forest",
+                     T ~ national_forest_connection))
 
 #TODO I think all other contractors that do not relate spatially to any of the NF, they should b
 # related to the NF that fall within the Lower Sacramento Watershed, since this is where the
@@ -131,7 +186,7 @@ saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
 # map datasets to NF and HUCs ---------------------------------------------
 # TODO: explore ways of clipping the data to the HUCs
 
-saveRDS(all_datasets_raw, here::here("data", "all_datasets.RDS"))
+# saveRDS(all_datasets_raw, here::here("data", "all_datasets.RDS"))
 
 # PLOTS -------------------------------------------------------------------
 # plotting both nf and watersheds, plus all_datasets to check accuracy---
