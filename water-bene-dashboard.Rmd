@@ -15,9 +15,12 @@ library(tidyverse)
 library(sf)
 library(DT)
 library(viridis)
+library(plotly)
 ```
 
 ```{r}
+colors <- c('#006475FF', '#00A1B7FF', '#55CFD8FF', '#586028FF', '#898928FF', '#616571FF', '#9DA7BFFF')
+
 # read in processed data
 nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
@@ -28,13 +31,19 @@ all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS"))
 
 ```{r}
 #TODO - check this createria since not sure it is working the way we think
+#MW: I think it's working but since the quantity metric is do different among the datasets, it filters
+#weird. Adding a group by dataset when it's none. 
 filter_by_metric <- function(data, column, metric) {
   if (metric == "None") {
     return(data)
   } else if (metric == "Top 10%") {
-    return(data |>  slice_max(order_by = {{ column }}, prop = 0.10))
+    return(data |>  
+             group_by(beneficiary_type) |> 
+             slice_max(order_by = {{ column }}, prop = 0.10))
   } else if (metric == "Top 25%") {
-    return(data |>  slice_max(order_by = {{ column }}, prop = 0.25))
+    return(data |>  
+             group_by(beneficiary_type) |> 
+             slice_max(order_by = {{ column }}, prop = 0.25))
   } else {
     warning("Unrecognized metric. Returning all data.")
     return(data)
@@ -60,7 +69,7 @@ conditionalPanel(
     label = tags$strong('Select watershed to identify connected benficiaries'),
     choices = c(unique(all_datasets$watershed_name)),
     selected = "Upper Sacramento") # TODO: placeholder
-  )
+)
 
 conditionalPanel(
   condition = "input.select_huc_or_nf == 'National Forest'",
@@ -72,7 +81,7 @@ conditionalPanel(
     #             "Shasta-Trinity National Forest", "Tahoe National Forest", "Trinity National Forest", "Klamath National Forest",
     #             "Modoc National Forest", "Six Rivers National Forest"),
     selected = "Klamath National Forest")
-  )
+)
 
 selectInput(
   inputId = "select_bene",
@@ -81,13 +90,13 @@ selectInput(
               "Water right owner" = "water_right",
               "CVP contractor" = "cvp",
               "SWP contractor" = "swp",
-              "Public water system" = "pws",
+              #"Public water system" = "pws",
               "Hydropower facility" = "hydropower",
-              "Agricultural landowner" = "ag",
-              "Business owner" = "business",
+              #"Agricultural landowner" = "ag",
+              #"Business owner" = "business",
               "Drinking water system" = "dws"),
   selected = "all"
-  )
+)
 
 radioButtons(
   inputId = "select_metric",
@@ -127,7 +136,7 @@ Row {.tabset}
 ```{r}
 output$map <- renderLeaflet({
   leaflet() |> 
-    addTiles() |> 
+    addTiles(group = "Default") |> 
     setView(lng = -122.5, lat = 39, zoom = 7)
 })
 ```
@@ -136,34 +145,34 @@ output$map <- renderLeaflet({
 #TODO check reactives since they dissapear when tabs are switched back and forth
 filtered_dataset <- reactive({
   req(input$select_bene, input$select_huc_or_nf)
-
+  
   data <- all_datasets
-
+  
   if (input$select_bene != "all") {
-    bene_type <- case_when( # TODO: let's make these all the same capitalization format 
+    bene_type <- case_when( 
       input$select_bene == "hydropower" ~ "hydropower facility",
-      input$select_bene == "cvp" ~ "CVP contractor",
-      input$select_bene == "swp" ~ "SWP contractor",
-      input$select_bene == "pws" ~ "Public water system",
-      input$select_bene == "ag" ~ "Agricultural landowner",
-      input$select_bene == "business" ~ "Business owner",
-      input$select_bene == "water_right" ~ "Water right owner",
-      input$select_bene == "dws" ~ "Drinking water system",
+      input$select_bene == "cvp" ~ "cvp contractor",
+      input$select_bene == "swp" ~ "swp contractor",
+      #input$select_bene == "pws" ~ "Public water system",
+      #input$select_bene == "ag" ~ "Agricultural landowner",
+      #input$select_bene == "business" ~ "business owner",
+      input$select_bene == "water_right" ~ "water right owner",
+      input$select_bene == "dws" ~ "drinking water system",
       TRUE ~ NA_character_
     )
     data <- data |> filter(beneficiary_type == bene_type)
   }
-
+  
   if (input$select_huc_or_nf == "National Forest" && 
       !is.null(input$select_nf) && input$select_nf != "All") {
     data <- data |> filter(national_forest_connection == input$select_nf)
   }
-
+  
   if (input$select_huc_or_nf == "Watershed (HUC6)" && 
       !is.null(input$select_huc) && input$select_huc != "All") {
     data <- data |> filter(watershed_name == input$select_huc)
   }
-
+  
   return(data)
 })
 
@@ -184,12 +193,19 @@ observe({
     return()
   }
   
-   bene_pal <- colorFactor(
-    palette = viridis_pal(option = "D", direction = 1)(
-      length(unique(all_datasets$beneficiary_type))
-    ),
+  
+  bene_pal <- colorFactor(
+    palette = colors,
     domain = all_datasets$beneficiary_type
   )
+  
+  # bene_pal <- colorFactor(
+  #   palette = viridis_pal(option = "D", direction = 1)(
+  #     length(unique(all_datasets$beneficiary_type))
+  #   ),
+  #   domain = all_datasets$beneficiary_type
+  # )
+  
   # popup for all beneficiary types - consider adding more fields?
   popup_content <- ~paste("<strong>Entity Name:</strong>", entity_name, "<br>", "<strong>Address:</strong>",
                           entity_address, "<br>", "<strong>Quantity:</strong>", quantity_metric, quantity_unit)
@@ -197,10 +213,10 @@ observe({
   is_polygon <- st_geometry_type(tmp_data) %in% c("POLYGON", "MULTIPOLYGON")
   polygons_centroid <- tmp_data[is_polygon, ] |> st_centroid()
   points <- tmp_data[!is_polygon, ]
-
+  
   all_points <- rbind(points, polygons_centroid) |> 
     st_cast("POINT") 
-
+  
   coords <- st_coordinates(all_points)
   all_points$longitude <- coords[, 1]
   all_points$latitude <- coords[, 2]
@@ -211,16 +227,18 @@ observe({
                      type = "warning", duration = 5)
     leafletProxy("map") |> clearMarkers() |> clearShapes()
     return()
-    }
+  }
   
   leafletProxy("map") |>
     clearMarkers() |>
     clearShapes() |>
     clearControls() |> 
+    addProviderTiles("CartoDB.Positron", group = "Greyscale") |>
+    addProviderTiles("Esri.WorldImagery", group = "Imagery") |>
     addCircleMarkers(data = all_points,
                      lng = ~longitude,
                      lat = ~latitude,
-                     radius = ~scales::rescale(quantity_metric, to = c(4, 12)),
+                     radius = ~scales::rescale(quantity_metric, to = c(6, 12)),
                      color = ~bene_pal(beneficiary_type),
                      stroke = TRUE,
                      weight = 1,
@@ -230,8 +248,12 @@ observe({
               pal = bene_pal,
               values = all_points$beneficiary_type,
               title = "Beneficiary Type",
-              opacity = 1)
-  })
+              opacity = 1) |> 
+    addLayersControl(
+      baseGroups = c("Default", "Greyscale", "Imagery"),
+      options = layersControlOptions(collapsed = FALSE)
+    )
+})
 
 observe({
   proxy <- leafletProxy("map") |>
@@ -241,11 +263,11 @@ observe({
   if ("Watersheds" %in% input$show_layers) {
     proxy <- proxy |> addPolygons(data = watersheds,
                                   group = "Watersheds",
-                                  color = "blue",
+                                  color = "darkblue",
                                   fillOpacity = 0.2,
                                   weight = 1,
                                   popup = ~name)
-    }
+  }
   if ("National Forests" %in% input$show_layers) {
     proxy <- proxy |> addPolygons(data = nf_boundaries,
                                   group = "National Forests",
@@ -253,8 +275,8 @@ observe({
                                   fillOpacity = 0.2,
                                   weight = 1,
                                   popup = ~name)
-    }
-  })
+  }
+})
 leafletOutput("map", height = "600px")
 
 ```
@@ -263,20 +285,24 @@ leafletOutput("map", height = "600px")
 
 ```{r}
 div(downloadButton("download_catalog", "Download Catalog Selection")
-    )
+)
 div(style = "height: 720px; overflow-y: auto;",
     DTOutput("catalog")
-    )
+)
 ```
 
 ```{r}
 output$catalog <- renderDT({
   req(input$select_bene, input$select_metric)
-
+  
   tmp_data <- filtered_dataset() |>
     filter_by_metric(quantity_metric, input$select_metric) |>
-    st_drop_geometry()
-
+    select(-latitude, -longitude) |> 
+    st_drop_geometry() |> 
+    arrange(desc(quantity_metric)) |> 
+    mutate(quantity_metric = scales::comma(quantity_metric, accuracy = 1)) |>
+    rename_with(~ tools::toTitleCase(gsub("_", " ", .x)))
+  
   datatable(tmp_data,
             options = list(
               pageLength = 10,
@@ -284,8 +310,8 @@ output$catalog <- renderDT({
               ordering = TRUE,
               paging = TRUE,
               lengthChange = TRUE)
-            )
-  })
+  )
+})
 
 output$download_catalog <- downloadHandler(
   filename = function() {
@@ -303,9 +329,12 @@ output$download_catalog <- downloadHandler(
 
 ### Summary
 
+The following is a plot of the top entities by each beneficiary type, grouped by the selected national forest boundary and totaled by alike entity names. 
+
 ```{r}
-# plotOutput("summary_plot")
 plotOutput("top_contractors_plot")
+#plotlyOutput("top_contractors_plot")
+
 ```
 
 ```{r}
@@ -336,21 +365,102 @@ output$top_contractors_plot <- renderPlot({
     st_drop_geometry()
   
   if (nrow(tmp_data) == 0) return(NULL)
-
+  
   top_entities <- tmp_data |>
-    arrange(desc(quantity_metric)) |>
+    select(beneficiary_type, quantity_metric, quantity_unit, entity_name) |>
+    st_drop_geometry() |>
+    group_by(beneficiary_type, entity_name) |>
+    summarise(sum_quantity_metric = sum(quantity_metric)) |>
+    arrange(desc(sum_quantity_metric)) |>
     slice_head(n = 10)
   
-  ggplot(top_entities, aes(x = reorder(entity_name, quantity_metric), y = quantity_metric, fill = beneficiary_type)) +
+  ggplot(top_entities, aes(x = reorder(entity_name, sum_quantity_metric), y = sum_quantity_metric, fill = beneficiary_type)) +
     geom_col() +
     coord_flip() +
     theme_minimal() +
-    labs(title = "Top 10 Contractors by Quantity",
-         x = "Entity Name",
-         y = "Quantity Metric",
-         fill = "Type") +
-    theme(legend.position = "bottom")
+    scale_fill_manual(values = colors) +
+    labs(#title = "Top 10 Contractors by Quantity",
+      x = "",
+      y = "Quantity Metric",
+      fill = "Type") +
+    theme(
+      legend.position = "top",
+      legend.title = element_blank(),
+      strip.text = element_text(size = 14, face = "bold")  
+    ) +
+    facet_grid(~beneficiary_type, scales = "free_x")
+})
+```
+
+```{r eval=FALSE, include=FALSE}
+# Playing around with Plotly - this is not used... 
+output$top_contractors_plot <- renderPlotly({
+  req(input$select_bene, input$select_metric)
+  
+  tmp_data <- filtered_dataset() |>
+    filter_by_metric(quantity_metric, input$select_metric) |>
+    st_drop_geometry()
+  
+  if (nrow(tmp_data) == 0) return(NULL)
+  
+  top_entities <- tmp_data |>
+    select(beneficiary_type, quantity_metric, quantity_unit, entity_name) |>
+    st_drop_geometry() |> 
+    group_by(beneficiary_type, entity_name) |> 
+    summarise(sum_quantity_metric = sum(quantity_metric)) |> 
+    arrange(desc(sum_quantity_metric)) |>
+    slice_head(n = 10)
+  
+  
+  beneficiary_types <- unique(top_entities$beneficiary_type)
+  
+  # Create a base plot object for each beneficiary type
+  plots <- lapply(beneficiary_types, function(bt) {
+    df <- top_entities %>%
+      filter(beneficiary_type == bt) %>%
+      arrange(desc(sum_quantity_metric)) %>%
+      mutate(entity_name = factor(entity_name, levels = rev(unique(entity_name))))
+    
+    plot_ly(
+      data = df,
+      x = ~sum_quantity_metric,
+      y = ~entity_name,
+      type = "bar",
+      orientation = "h",
+      name = bt,
+      marker = list(color = "#006475FF")  
+    )
   })
+  
+  p <- subplot(plots, nrows = 1, shareY = TRUE) %>%
+    layout(
+      title = "Top 10 Contractors by Quantity",
+      xaxis = list(title = "Quantity Metric"),
+      yaxis = list(title = "Entity Name"),
+      updatemenus = list(
+        list(
+          type = "buttons",
+          direction = "right",
+          x = 0.1,
+          y = 1.15,
+          buttons = lapply(seq_along(beneficiary_types), function(i) {
+            list(
+              method = "update",
+              args = list(
+                list(visible = sapply(seq_along(plots), function(j) j == i)),
+                list(title = paste("Top 10 Contractors by", beneficiary_types[i]))
+              ),
+              label = beneficiary_types[i]
+            )
+          })
+        )
+      ),
+      showlegend = FALSE
+    )
+  
+  return(p)
+})
+
 ```
 
 
