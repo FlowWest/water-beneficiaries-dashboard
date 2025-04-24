@@ -327,9 +327,9 @@ output$download_catalog <- downloadHandler(
 )
 ```
 
-### Summary
+### Summary 
 
-The following is a plot of the top entities by each beneficiary type, grouped by the selected national forest boundary and totaled by alike entity names. 
+<!-- Summary plot of the top entities by each beneficiary type, grouped by the selected national forest boundary and totaled by alike entity names.  -->
 
 ```{r}
 plotOutput("top_contractors_plot")
@@ -379,14 +379,21 @@ output$top_contractors_plot <- renderPlot({
     coord_flip() +
     theme_minimal() +
     scale_fill_manual(values = colors) +
-    labs(#title = "Top 10 Contractors by Quantity",
-      x = "",
-      y = "Quantity Metric",
-      fill = "Type") +
+    scale_y_continuous(
+      labels = scales::label_number(
+        scale_cut = scales::cut_short_scale(),
+        accuracy = 1
+      )
+    ) +    
+    labs(title = "Top 10 Contractors by Quantity",
+                x = "",
+                y = "Quantity Metric") +
     theme(
-      legend.position = "top",
-      legend.title = element_blank(),
-      strip.text = element_text(size = 14, face = "bold")  
+      # legend.position = "top",
+      #legend.title = element_blank(),
+      legend.position = "none",   
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+      strip.text = element_text(size = 12, face = "bold")  
     ) +
     facet_grid(~beneficiary_type, scales = "free_x")
 })
