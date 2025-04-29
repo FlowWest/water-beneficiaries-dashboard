@@ -27,10 +27,17 @@ While the SWP was being constructed in the 1960s, public agencies and local wate
 - Water Contracts are on a PDF version, this is not machine readable 
 - Geodata is not publicly available
 - The format of the contact information of SWP contractors is not machine readable. We manually extracted that information to integrate with contract information
-- The contractors names are inconsistent accross the datasets that we use to compile their information
+- The contractors names are inconsistent across the datasets that we use to compile their information
+
+**Summary of data sources and data used:**
+
+- SWP contractor list sourced from DWR's [website](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors)
+- Geodata was extracted from WaterDistricts Polygons - [California State Geoportal](https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore) 
+- Contractors contact information - [California DWR](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors)
 
 
-## SWP contractor list can be found at DWR's [website](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors)
+
+# SWP contractor data pull/processing
 
 ```{r include=FALSE}
 # reading swp spreadsheet per region
@@ -72,18 +79,20 @@ swp_raw_6 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |>
 
 ```
 
-# SWP Contractors 
-
 ```{r echo=TRUE}
 # combining all swp contract regions
 swp_contracts_raw <- bind_rows(swp_raw_1, swp_raw_2, swp_raw_3, swp_raw_4, swp_raw_5, swp_raw_6) |> glimpse()
 ```
 
-# Geodata 
+# Geodata pull/ processing
 
 ## Water districts
 
-Data was sourced from the California State Geoportal - i03 WaterDistricts available [here](https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore) 
+Data cleaning includes: 
+
+  - Cleaning contractor names to match as listed on the contractor list above
+  - Filtering water districts of interest
+  - Compressing Geodata 
 
 ```{r include=FALSE}
 # source for the geo data - https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore?location=36.064525%2C-119.270000%2C6.04
@@ -190,6 +199,10 @@ leaflet(swp_contracts_w_locations) |>
 # Contact info 
 
 This information was gathered from [CDW site](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors) and was digitized manually
+
+Data cleaning includes: 
+
+  - Cleaning contractor names to match as listed on the contractor list above
 
 ```{r echo=FALSE}
 contact_info <- read_csv("data-raw/SWP/SWP_contractors_info.csv") |>
