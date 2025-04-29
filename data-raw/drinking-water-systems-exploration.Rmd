@@ -24,9 +24,16 @@ There are 4 relevant datasets to understanding public water systems:
 
 4. [Urban water retailer demand](https://data.ca.gov/dataset/urws-conservation-supply-demand).
 
+5. Spreadsheet shared to Ashley by (?) - `PWS_ID_Contractors`. This resource will be used to link PWS to the contracts (CVP, SWP CRA, AAC)
+
 # Overview 
 
-This markdown will only pull the [Drinking water system area boundaries](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc) data, to do initial National Forest relationship 
+This markdown will pull and process as follows:
+
+  - The [Drinking water system area boundaries](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc) polygons will be use to visualize service area boundaries.
+  - Excel file `PWS_ID_Contractors` will be used to connect the PWS Id's to the contractors that deliver water, this will provide a relationship to a watershed, to then follow data processing and assign National Forest relationship
+  - [Urban water retailer demand](https://data.ca.gov/dataset/urws-conservation-supply-demand) and [Water supply and demand](https://data.ca.gov/dataset/drinking-water-public-water-system-annually-reported-water-production-and-delivery-information-2013/resource/ddac281d-4f71-45ba-99bd-394fa33d0e58) will be used to assign the amount/demand of water
+  
 
 ```{r include=FALSE}
 # drinking water system boundaries #############################################
@@ -42,39 +49,6 @@ leaflet(dw_system_boundaries) |>
   addPolygons()
 ```
 
-
-```{r echo=FALSE}
-# reading watersheds to clip dws
-# watersheds <- readRDS(here::here("data", "watersheds.RDS")) |>
-#   st_make_valid() |> 
-#   st_transform(4326)  
-# 
-# dw_system_boundaries <- dw_system_boundaries |>
-#   st_make_valid() |> 
-#   st_transform(4326)
-# 
-# # clipping drinking water systems to watersheds of interest
-# dws_norcal <- st_intersects(dw_system_boundaries, watersheds)
-# dws_norcal_sf <- dw_system_boundaries[selected, ]
-# 
-# dws<- dws_norcal_sf |> 
-#   mutate(beneficiary_type = "drinking water system",
-#          national_forest_connection = NA,
-#          entity_name = WATER_SY_1,
-#          entity_address = ADDR_LINE_,
-#          entity_contact = AC_PHONE_N,
-#          quantity_metric = NA,
-#          quantity_unit = NA) |> 
-#   select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |> 
-#   glimpse()
-# 
-# # plotting
-# leaflet(dws) |>
-#   addTiles() |>
-#   addPolygons()
-
-```
-
 ```{r}
 dw_system_boundaries <- dw_system_boundaries |>
   st_make_valid() |>
@@ -86,6 +60,15 @@ leaflet(dw_system_boundaries) |>
   addCircles()
 
 ```
+
+```{r}
+# 5. reading excel to link PWS to the contracts (CVP, SWP CRA, AAC)
+contractor_type_raw <- readxl::read_excel("data-raw/drinking_water_systems/PWS_ID_Contractors.xlsx") |> 
+  clean_names() |> 
+  glimpse()
+
+```
+
 ```{r}
 
 water_beneficiaries_project_board <- pins::board_s3(bucket = "water-beneficiaries", region = "us-east-1")
@@ -133,6 +116,28 @@ dw_system_demand <- left_join(dw_system_boundaries |>
 #TODO note that this data will then be joined to geospatial source, just pulling it as a placeholder for now to
 # obtain the quantity metric
 ```
+
+```{r include=FALSE}
+dw_system_contracts <- left_join(dw_system_demand, contractor_type_raw) |> 
+  glimpse()
+```
+
+```{r}
+colors <- c('orange', '#55CFD8FF', 'green', 'red', 'black')
+pal <- colorFactor(
+    palette = colors,
+    domain = dw_system_contracts$project)
+    
+leaflet(dw_system_contracts) |> 
+  addTiles() |> 
+  addPolygons(color = ~pal(project),
+              popup = ~paste("<strong>Entity ID:</strong>", pwsid, "<br>", "<strong>Entity Name:</strong>",
+                          water_sy_1, "<br>", "<strong>Delivery Contractor:</strong>", project))
+```
+
+#TODO notes:think through how to relate those dw systems that do not have a "project" assigned. (goal is to relate to a watershed, to then relate to NF. Continue processing pipeline)
+thoughts are: (1) we create a relationship guesstimating what infrastructure they are near to, or (2) assign spatial relationship based exclusively on the service area polygons.
+
 ```{r}
 dws<- dw_system_demand |>
   mutate(beneficiary_type = "drinking water system",
