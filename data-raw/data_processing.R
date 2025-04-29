@@ -22,14 +22,13 @@ watersheds <- watersheds |> # renaming to differentiate
 nf_boundaries <- nf_boundaries |> # renaming to differentiate
   rename(nf_name = name)
 
-# hydropower
+## hydropower ----
 hydropower <- readRDS('data-raw/hydropower_clean.RDS') |>
   select(beneficiary_type, entity_name, entity_address, quantity_metric, quantity_unit, national_forest_connection, latitude, longitude, geometry) |>
    st_transform(4326)
 
 ## cvp ----
 cvp <- readRDS(here::here("data", "cvp.RDS"))
-
 cvp_centroids <- st_centroid(cvp)
 cvp_coords <- st_coordinates(cvp_centroids)
 cvp$longitude <- cvp_coords[,1]
@@ -60,19 +59,21 @@ cvp_lookup <- tibble::tribble(
   "Upper American River", "Lower Sacramento",
   "Delta-Mendota Canal", "Upper Sacramento",
   "Delta-Mendota Canal",  "Klamath",
+  "Mendota Pool", "Upper Sacramento",
+  "Mendota Pool",  "Klamath",
   "Contra Costa Canal", "Upper Sacramento",
-  "Contra Costa Canal",  "Klamath"
-  # Only including facilities that map to your 4 target basins
-)
-
+  "Contra Costa Canal",  "Klamath")  # Only including facilities that map to 4 target basins
 
 cvp_watershed_clean <- cvp_watershed |>
   left_join(cvp_lookup, by = "cvp_unit_name", suffix = c("", "_lookup")) |>
   mutate(watershed_name = case_when(!is.na(watershed_name) ~ watershed_name,
                                     is.na(watershed_name) & !is.na(watershed_name_lookup) ~ watershed_name_lookup,  # use lookup
-                                    TRUE ~ NA_character_)
-         ) |>
-  select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
+                                    TRUE ~ NA_character_))
+
+cvp_watershed_clean |> filter(is.na(watershed_name)) |> view() # quick check for watershed NA's
+
+cvp_watershed_clean <- cvp_watershed_clean |>
+  select(cvp_unit_name, beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
          national_forest_connection, watershed_name, latitude, longitude, geometry) |>
   glimpse()
 
@@ -80,16 +81,8 @@ cvp_centroids <- st_centroid(cvp_watershed_clean)
 cvp_coords <- st_coordinates(cvp_centroids)
 cvp_watershed_clean$longitude <- cvp_coords[,1]
 cvp_watershed_clean$latitude <- cvp_coords[,2]
-# the remainin NA's are related to lower basins like san joaquin and tulare - will add nf relationship to all
-# tried adding relationshp to all basins but data becomes significantly larger, it will probably be best to
-# add nf relationship manually. See code below
-
-# cvp_watershed_clean <- cvp_watershed_clean |>
-#   mutate(watershed_name = if_else(
-#     is.na(watershed_name),
-#     list(c("Lower Sacramento", "Upper Sacramento", "Northern California Coastal", "Klamath")),
-#     list(watershed_name))) |>
-#   tidyr::unnest_longer(watershed_name)
+# the remaining watershed NA's are related to lower basins like san joaquin and tulare, we will omit these
+# for more details look at project Lucid
 
 ## swp ----
 swp <- readRDS(here::here("data", "swp.RDS"))
@@ -103,24 +96,20 @@ is_polygon <- st_geometry_type(swp) %in% c("POLYGON", "MULTIPOLYGON")
 polygons_centroid <- swp[is_polygon, ] |> st_centroid()
 points <- swp[!is_polygon, ]
 
-
 swp <- swp |>
   st_set_crs(4326) |>
   st_transform(4326) |>
   select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
          national_forest_connection, latitude, longitude, geometry)
 
-
-# water rights
+## water rights ----
 water_rights <- readRDS('data-raw/water_rights_clean.RDS') |>
   mutate(beneficiary_type = "water right owner") |>
   st_transform(4326)
 
 water_rights <- st_make_valid(water_rights)
 
-
-
-# drinking water
+## drinking water ----
 dws <- readRDS(here::here("data", "drinking_water_boundaries.RDS"))
 dws <- st_make_valid(dws)
 dws_centroids <- st_centroid(dws)
@@ -131,19 +120,21 @@ dws$latitude <- dws_coords[,2]
 dws <- dws |>
 select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
        national_forest_connection, latitude, longitude, geometry)
-# binding all datasets ----------------------------------------------------
+
+
+# binding all datasets to process -----------------------------------------
 all_datasets_raw <- bind_rows(hydropower, swp, dws, water_rights) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
 
-# assign overlap watershed to datasets
+## (1) assign watershed to datasets: if polygons/points fall within a watershed
 all_datasets_watershed <- st_join(all_datasets_raw, watersheds, left = TRUE) |> glimpse()
 
-# bind cvp
+# bind cvp, since processing was done above using cvp_units
 all_datasets_with_ws <- bind_rows(all_datasets_watershed, cvp_watershed_clean)
 
-# assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
+## (2)  assign overlap nf to watersheds - this serves as a watershed–NF lookup and do spatial join
 watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
   st_drop_geometry() |>
   distinct(watershed_name, nf_name) |>
@@ -157,22 +148,18 @@ watershed_nf <- st_join(watersheds, nf_boundaries[, "nf_name"], left = TRUE) |>
 #   glimpse()
 
 
-# joining to find dataset-nf relationship, add geometry from original all_datasets
+## (3) joining to find dataset-nf relationship, add geometry from original all_datasets
 all_datasets_results_raw <- left_join(all_datasets_with_ws, watershed_nf, by = "watershed_name") |>
   select(-national_forest_connection) |>
   rename(national_forest_connection = nf_name) |>
   glimpse()
-# fixing swp manually
 
+# To those SWP contracts that do not fall within a watershed,
+# therefore lack of NF connection, we will assume that they connect to Lassen NF
 all_datasets_results <- all_datasets_results_raw |>
   mutate(national_forest_connection =
            case_when(is.na(national_forest_connection) & beneficiary_type == "swp contractor" ~ "Lassen National Forest",
                      T ~ national_forest_connection))
-
-#TODO I think all other contractors that do not relate spatially to any of the NF, they should b
-# related to the NF that fall within the Lower Sacramento Watershed, since this is where the
-# SWP comes from. Check if this is the case, or if any other watershed makes more sense
-# for CVP
 
 # splitting points and polygons for plotting purposes
 geom_types <- st_geometry_type(all_datasets_results)
@@ -182,14 +169,8 @@ result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYG
 # save dataset ------------------------------------------------------------
 saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
 
-
-# map datasets to NF and HUCs ---------------------------------------------
-# TODO: explore ways of clipping the data to the HUCs
-
-# saveRDS(all_datasets_raw, here::here("data", "all_datasets.RDS"))
-
 # PLOTS -------------------------------------------------------------------
-# plotting both nf and watersheds, plus all_datasets to check accuracy---
+# plotting both nf and watersheds, plus all_datasets to check accuracy
 leaflet() |>
   addTiles() |>
   addPolygons(data = nf_boundaries,
@@ -231,41 +212,4 @@ leaflet() |>
     overlayGroups = c("National Forests", "Watersheds",
                       "Beneficiaries (Points)", "Beneficiaries (Polygons)"),
     options = layersControlOptions(collapsed = FALSE))
-
-
-# part 2 ------
-#qc'ing SWP - TODO this are the records that need separate adjustment, the the and criteria needed
-all_datasets_results |>
-  filter(beneficiary_type == "swp contractor" & is.na(national_forest_connection)) |>
-  mutate(national_forest_connection =
-           case_when(is.na(national_forest_connection) & beneficiary_type == "swp contractor" ~ "Lassen National Forest",
-         T ~ national_forest_connection)) |>
-  filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) |>
-  leaflet() |>
-  addTiles() |>
-  addPolygons(color = "orange",
-              weight = 1,
-              fillOpacity = 0.5,
-              popup = ~paste(
-                "<strong>Beneficiary Type:</strong>", beneficiary_type,
-                "<br><strong>Entity Name:</strong>", entity_name,
-                "<br><strong>Watershed:</strong>", watershed_name,
-                "<br><strong>National Forest:</strong>", national_forest_connection))
-# qc' in CVP
-# TODO this are the records that need separate adjustment, use lucid to relate cvp_unit_name to watershed
-all_datasets_results |>
-  filter(beneficiary_type == "cvp contractor" & is.na(national_forest_connection)) |>
-  distinct(entity_name) |>
-  view()
-  # filter(st_geometry_type(geometry) %in% c("POLYGON", "MULTIPOLYGON")) |>
-  # leaflet() |>
-  # addTiles() |>
-  # addPolygons(color = "purple",
-  #             weight = 1,
-  #             fillOpacity = 0.5,
-  #             popup = ~paste(
-  #               "<strong>Beneficiary Type:</strong>", beneficiary_type,
-  #               "<br><strong>Entity Name:</strong>", entity_name,
-  #               "<br><strong>Watershed:</strong>", watershed_name,
-  #               "<br><strong>National Forest:</strong>", national_forest_connection))
 
