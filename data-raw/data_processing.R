@@ -105,25 +105,32 @@ swp <- swp |>
 ## water rights ----
 water_rights <- readRDS('data-raw/water_rights_clean.RDS') |>
   mutate(beneficiary_type = "water right owner") |>
-  st_transform(4326)
+  st_transform(4326) |>
+  rename(entity_contact = entitity_contact)
 
 water_rights <- st_make_valid(water_rights)
 
 ## drinking water ----
-dws <- readRDS(here::here("data", "drinking_water_boundaries.RDS"))
-dws <- st_make_valid(dws)
-dws_centroids <- st_centroid(dws)
+dws_raw <- readRDS(here::here("data", "drinking_water_boundaries.RDS"))
+dws_raw <- st_make_valid(dws_raw)
+dws_centroids <- st_centroid(dws_raw)
 dws_coords <- st_coordinates(dws_centroids)
-dws$longitude <- dws_coords[,1]
-dws$latitude <- dws_coords[,2]
+dws_raw$longitude <- dws_coords[,1]
+dws_raw$latitude <- dws_coords[,2]
 
-dws <- dws |>
-select(beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
+dws_clean <- dws_raw |>
+select(pwsid, beneficiary_type, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit,
        national_forest_connection, latitude, longitude, geometry)
+# reading excel to link PWS to the contracts (CVP, SWP CRA, AAC)
+dws_contractor_type_raw <- readxl::read_excel("data-raw/drinking_water_systems/PWS_ID_Contractors.xlsx") |>
+  clean_names()
 
+dws_projects <- left_join(dws_clean, dws_contractor_type_raw) |>
+  select(-pwsid, -district) |>
+  glimpse()
 
 # binding all datasets to process -----------------------------------------
-all_datasets_raw <- bind_rows(hydropower, swp, dws, water_rights) |>
+all_datasets_raw <- bind_rows(hydropower, swp, dws_projects, water_rights) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
@@ -154,12 +161,46 @@ all_datasets_results_raw <- left_join(all_datasets_with_ws, watershed_nf, by = "
   rename(national_forest_connection = nf_name) |>
   glimpse()
 
-# To those SWP contracts that do not fall within a watershed,
-# therefore lack of NF connection, we will assume that they connect to Lassen NF
-all_datasets_results <- all_datasets_results_raw |>
-  mutate(national_forest_connection =
-           case_when(is.na(national_forest_connection) & beneficiary_type == "swp contractor" ~ "Lassen National Forest",
-                     T ~ national_forest_connection))
+## Additional processing for drinking water systems and for those SWP contracts that do not fall within a watershed,
+# we will assume that they connect to Lassen NF
+# reference table for dws that relate to cvp project
+dws_cvp_forests <- c("Shasta National Forest", "Lassen National Forest",
+                 "Klamath National Forest", "Six Rivers National Forest")
+
+## (4) additional manual processing
+# nf's that will be related to dw systems (those that have cvp project relationship)
+dws_cvp_forests <- c("Shasta National Forest", "Lassen National Forest",
+                     "Klamath National Forest", "Six Rivers National Forest")
+
+dws_cvp_expand_rows <- all_datasets_results_raw |>
+  filter(is.na(national_forest_connection),
+         beneficiary_type == "drinking water system",
+         project == "Central Valley Project")
+
+n_dws_cvp <- nrow(dws_cvp_expand_rows)
+
+# expanding rows
+dws_cvp_expanded <- dws_cvp_expand_rows |>
+  slice(rep(1:n_dws_cvp, each = length(dws_cvp_forests))) |>
+  mutate(national_forest_connection = rep(dws_cvp_forests, times = n_dws_cvp))
+
+fallback_assigned <- all_datasets_results_raw |>
+  filter(is.na(national_forest_connection),
+         beneficiary_type == "swp contractor" |
+           (beneficiary_type == "drinking water system" & project == "State Water Project")) |>
+  mutate(national_forest_connection = "Lassen National Forest")
+
+# keeping remaining rows
+remaining <- all_datasets_results_raw |>
+  filter(!(is.na(national_forest_connection) &
+             (beneficiary_type == "swp contractor" |
+                (beneficiary_type == "drinking water system" & project %in% c("State Water Project", "Central Valley Project")))))
+
+# combining all results
+all_datasets_results <- bind_rows(remaining, fallback_assigned, dws_cvp_expanded) |>
+  select(beneficiary_type, entity_name, entity_contact, entity_address, quantity_metric, quantity_unit,
+         latitude, longitude, watershed_name, huc6, national_forest_connection)
+
 
 # splitting points and polygons for plotting purposes
 geom_types <- st_geometry_type(all_datasets_results)
