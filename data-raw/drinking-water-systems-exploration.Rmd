@@ -117,12 +117,12 @@ dw_system_demand <- left_join(dw_system_boundaries |>
 # obtain the quantity metric
 ```
 
-```{r include=FALSE}
-dw_system_contracts <- left_join(dw_system_demand, contractor_type_raw) |> 
+```{r eval=FALSE, include=FALSE}
+dw_system_contracts <- left_join(dw_system_demand, contractor_type_raw) |>  # joining just for visual purposes for now
   glimpse()
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 colors <- c('orange', '#55CFD8FF', 'green', 'red', 'black')
 pal <- colorFactor(
     palette = colors,
@@ -147,8 +147,8 @@ dws<- dw_system_demand |>
          entity_contact = ac_phone_n,
          quantity_metric = demand_gallons,
          quantity_unit = "gallons") |>
-  select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |>
-  glimpse()
+  select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit, pwsid) |>
+  glimpse() # keeping pwsid so that it can be used to relate to SWP and CVP contract on data processing 
 ```
 
 
