@@ -6,7 +6,7 @@ The following downstream users were identified and geolocated for use in the app
 
 -   Water right owners
 
--   CVP contractors [documentation]
+-   CVP contractors 
 
 -   SWP contractors
 
