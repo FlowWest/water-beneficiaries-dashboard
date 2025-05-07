@@ -17,7 +17,6 @@ The purpose of this markdown is to get familiar with the dataset, identify any l
 
 Power plant data was sourced from the [U.S. Energy Atlas](https://atlas.eia.gov/datasets/bf5c5110b1b944d299bb683cdbd02d2a_0/explore?location=32.051243%2C61.504000%2C2.53)
 
-**Challenges:**
 
 ```{r, echo=FALSE}
 

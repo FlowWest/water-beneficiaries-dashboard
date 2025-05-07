@@ -14,10 +14,8 @@ library(leaflet)
 library(sf)
 ```
 
-Data Dictionary: https://waterrightsmaps.waterboards.ca.gov/viewer/Resources/Images/eWRIMS/download/POD_data_dictionary.pdf
-
-
-https://gispublic.waterboards.ca.gov/portal/home/item.html?id=746870b4aa1f47579ca1bf5d6c9924a8
+**Data Dictionary:** https://waterrightsmaps.waterboards.ca.gov/viewer/Resources/Images/eWRIMS/download/POD_data_dictionary.pdf
+**Data Source:** https://gispublic.waterboards.ca.gov/portal/home/item.html?id=746870b4aa1f47579ca1bf5d6c9924a8
 
 ```{r include=FALSE}
 # Water rights data ###########################################################
@@ -56,11 +54,9 @@ pal <- colorNumeric(palette = "Blues", domain = ewrims_top10$FACE_VALUE_OR_REPOR
 leaflet(data = ewrims_top10) |> 
   addTiles() |> 
   addCircleMarkers(data = ewrims_top10,
-                   # ~longitude, ~latitude,
                    fillColor = ~pal(FACE_VALUE_OR_REPORTED_VALUE),
                    color = ~pal(FACE_VALUE_OR_REPORTED_VALUE),
                    radius = 1,
-                   #radius = ~sqrt(FACE_VALUE_OR_REPORTED_VALUE) ,
                    opacity = 1, 
                    fillOpacity = 0.8,
                    popup = ~paste(
@@ -91,6 +87,8 @@ ewrims_top10 |>
 ```
 
 ### Format data for dashboard 
+
+**Note:** Water rights in the dashboard are filtered to those greater than the mean
 
 ```{r}
 ewrims_clean <- ewrims_pod |> 

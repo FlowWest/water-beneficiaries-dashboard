@@ -12,7 +12,7 @@ nf_raw <- read_sf(here::here('data-raw', 'shapefiles', 'nf_boundaries', 'S_USA.N
   filter(nfslandu_1 == "National Forest") |>
   glimpse()
 
-unique(nf_bounds$nfslandu_2)
+unique(nf_raw$nfslandu_2)
 
 names <- c('Klamath National Forest',
            'Lassen National Forest',

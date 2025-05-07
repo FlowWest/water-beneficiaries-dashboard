@@ -139,7 +139,7 @@ leaflet(dw_system_contracts) |>
 thoughts are: (1) we create a relationship guesstimating what infrastructure they are near to, or (2) assign spatial relationship based exclusively on the service area polygons.
 
 ```{r}
-dws<- dw_system_demand |>
+dws <- dw_system_demand |>
   mutate(beneficiary_type = "drinking water system",
          national_forest_connection = NA,
          entity_name = water_sy_1,
@@ -149,20 +149,6 @@ dws<- dw_system_demand |>
          quantity_unit = "gallons") |>
   select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit, pwsid) |>
   glimpse() # keeping pwsid so that it can be used to relate to SWP and CVP contract on data processing 
-```
-
-
-```{r}
-# dws<- dw_system_boundaries |>
-#   mutate(beneficiary_type = "drinking water system",
-#          national_forest_connection = NA,
-#          entity_name = water_syst,
-#          entity_address = addr_line,
-#          entity_contact = ac_phone_n,
-#          quantity_metric = NA,
-#          quantity_unit = NA) |>
-#   select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit) |>
-#   glimpse()
 ```
 
 Save RDS

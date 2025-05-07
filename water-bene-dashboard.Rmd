@@ -1,11 +1,15 @@
 ---
 title: "Water Beneficiaries Dashboard"
-output: 
+output:
   flexdashboard::flex_dashboard:
-   theme: readable
-   font_family: "Roboto"
-   google_fonts: true
+    theme: readable
+    font_family: Roboto
+    google_fonts: true
 runtime: shiny
+resource_files:
+- data/watersheds.RDS
+- data/all_datasets_results.RDS
+- data/nf_boundaries.RDS
 ---
 
 ```{r setup, include=FALSE}
@@ -25,7 +29,6 @@ colors <- c('#006475FF', '#00A1B7FF', '#55CFD8FF', '#586028FF', '#898928FF', '#6
 nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 
-# all_datasets <- readRDS(here::here("data", "all_datasets.RDS"))
 all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS")) 
 ```
 
@@ -76,7 +79,7 @@ conditionalPanel(
   selectInput(
     inputId = 'select_nf',
     label = tags$strong('Select National Forest to identify connected benficiaries'),
-    choices = c(unique(all_datasets$national_forest_connection)),
+    choices = c(unique(na.omit(all_datasets$national_forest_connection))),
     # choices = c("Eldorado National Forest", "Lassen National Forest", "Mendocino National Forest", "Plumas National Forest", 
     #             "Shasta-Trinity National Forest", "Tahoe National Forest", "Trinity National Forest", "Klamath National Forest",
     #             "Modoc National Forest", "Six Rivers National Forest"),

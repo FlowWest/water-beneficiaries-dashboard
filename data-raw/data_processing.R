@@ -123,7 +123,7 @@ select(pwsid, beneficiary_type, entity_name, entity_address, entity_contact, qua
        national_forest_connection, latitude, longitude, geometry)
 # reading excel to link PWS to the contracts (CVP, SWP CRA, AAC)
 dws_contractor_type_raw <- readxl::read_excel("data-raw/drinking_water_systems/PWS_ID_Contractors.xlsx") |>
-  clean_names()
+  janitor::clean_names()
 
 dws_projects <- left_join(dws_clean, dws_contractor_type_raw) |>
   select(-pwsid, -district) |>
