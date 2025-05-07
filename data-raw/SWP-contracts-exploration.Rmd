@@ -1,0 +1,304 @@
+---
+title: "Data Exploration - State Water Project (SWP) Water Contracts "
+author: "Badhia Yunes Katz"
+date: "04/02/2025"
+output: rmarkdown::html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width=15, fig.height=10)
+library(tidyverse)
+library(lubridate)
+library(readxl)
+library(janitor)
+library(sf)
+library(leaflet)
+library(rmapshaper)
+library(httr)
+```
+
+The purpose of this markdown is to get familiar with the State Water Project contract dataset, identify any limitations, determine if it is useful and why, and any data processing that needs to be done.
+
+**Notes:**
+
+While the SWP was being constructed in the 1960s, public agencies and local water districts signed long-term water supply contracts with DWR. Today, the 29 public agencies and local water districts are collectively known as the SWP long-term water contractors or simply, SWP water contractors. The water supply contracts (which expire in 2035) sets forth the maximum amount of SWP water a contractor may request annually (see Table A amounts, below). However, the amount of SWP water available for delivery will vary yearly, based on hydrologic conditions, current reservoir storage, and combined requests from the SWP water contractor.
+
+**Challenges:**
+
+- Water Contracts are on a PDF version, this is not machine readable 
+- Geodata is not publicly available
+- The format of the contact information of SWP contractors is not machine readable. We manually extracted that information to integrate with contract information
+- The contractors names are inconsistent across the datasets that we use to compile their information
+
+**Summary of data sources and data used:**
+
+- SWP contractor list sourced from DWR's [website](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors)
+- Geodata was extracted from WaterDistricts Polygons - [California State Geoportal](https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore) 
+- Contractors contact information - [California DWR](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors)
+
+
+
+# SWP contractor data pull/processing
+
+```{r include=FALSE}
+# reading swp spreadsheet per region
+swp_raw_1 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |> 
+  clean_names() |> 
+  slice(2:4) |> 
+  mutate(region = "feather river") |> 
+  glimpse()
+
+swp_raw_2 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |> 
+  clean_names() |> 
+  slice(7:8) |> 
+  mutate(region = "north bay") |> 
+  glimpse()
+
+swp_raw_3 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |> 
+  clean_names() |> 
+  slice(11:13) |> 
+  mutate(region = "south bay") |> 
+  glimpse()
+
+swp_raw_4 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |> 
+  clean_names() |> 
+  slice(16:21) |> 
+  mutate(region = "san joaquin valley") |> 
+  glimpse()
+
+swp_raw_5 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |> 
+  clean_names() |> 
+  slice(24:25) |> 
+  mutate(region = "central coast") |> 
+  glimpse()
+
+swp_raw_6 <- read_csv("data-raw/SWP/SWP-water-contractors.csv") |> 
+  clean_names() |> 
+  slice(28:40) |> 
+  mutate(region = "southern california") |> 
+  glimpse()
+
+```
+
+```{r echo=TRUE}
+# combining all swp contract regions
+swp_contracts_raw <- bind_rows(swp_raw_1, swp_raw_2, swp_raw_3, swp_raw_4, swp_raw_5, swp_raw_6) |> glimpse()
+```
+
+# Geodata pull/ processing
+
+## Water districts
+
+Data cleaning includes: 
+
+  - Cleaning contractor names to match as listed on the contractor list above
+  - Filtering water districts of interest
+  - Compressing Geodata 
+
+```{r include=FALSE}
+# source for the geo data - https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore?location=36.064525%2C-119.270000%2C6.04
+# water district polygons
+geojson_path <- "data-raw/CVP/WaterDistricts.geojson"
+geo_data <- st_read(geojson_path) |> 
+  clean_names()
+
+#filtering out polygons of swp contracts and matching goadata names to swp list
+swp_agencies_geodata <- geo_data |>
+  filter(agencyname %in% c("Butte County of", "Plumas County Flood Control and Water Conservation District",
+                   "Yuba City", "Napa County Flood Control and Water Conservation District", "Solano County Water Agency",
+                   "Alameda County Water District", "Alameda County Flood Control District  Zone 7",
+                   "Santa Clara Valley Water District", "San Luis Obispo County Flood Control And Water Conservation District",
+                   "Santa Barbara County Flood Control and Water Conservation District", "Oak Flat Water District", 
+                   "Kings County", "Dudley Ridge Water District", "Empire West Side Irrigation District", 
+                   "Kern County Water Agency", "Tulare Lake Basin Water Storage District", 
+                   "Antelope Valley - East Kern Water Agency", "Santa Clarita Valley Water Agency", 
+                   "Coachella Valley Water District", "Crestline - Lake Arrowhead Water Agency", "Desert Water Agency",
+                   "Littlerock Creek Irrigation District", "Metropolitan Water District Of Southern California", 
+                   "Mojave Water Agency", "Palmdale Water District", "San Bernardino Valley Municipal Water District",
+                   "San Bernardino Valley Municipal Water District", "San Gabriel Valley Municipal Water District", "San Gorgonio Pass Water Agency", "Ventura County Watershed Protection District")) |> 
+  mutate(agency_name_clean = case_when(agencyname == "Butte County of" ~ "County of Butte",
+                                       agencyname == "Plumas County Flood Control and Water Conservation District" ~ "Plumas County FC&WCD",
+                                       agencyname == "Yuba City" ~ "City of Yuba City",
+                                       agencyname == "Napa County Flood Control and Water Conservation District" ~ "Napa County FC&WCD",
+                                       agencyname == "Solano County Water Agency" ~ "Solano County WA",
+                                       agencyname == "Alameda County Water District" ~ "Alameda County WD",
+                                       agencyname == "Alameda County Flood Control District  Zone 7" ~ "Alameda County FC&WCD, Zone 7",
+                                       agencyname == "Santa Clara Valley Water District" ~ "Santa Clara Valley WD",
+                                       agencyname == "San Luis Obispo County Flood Control And Water Conservation District" ~ "San Luis Obispo County FC&WCD",
+                                       agencyname == "Santa Barbara County Flood Control and Water Conservation District" ~ "Santa Barbara County FC&WCD",
+                                       agencyname == "Oak Flat Water District" ~ "Oak Flat WD",
+                                       agencyname == "Kings County" ~ "County of Kings",
+                                       agencyname == "Dudley Ridge Water District" ~ "Dudley Ridge WD",
+                                       agencyname == "Empire West Side Irrigation District" ~ "Empire West Side ID",
+                                       agencyname == "Kern County Water Agency" ~ "Kern County WA",
+                                       agencyname == "Tulare Lake Basin Water Storage District" ~ "Tulare Lake Basin WSD",
+                                       agencyname == "Antelope Valley - East Kern Water Agency" ~ "Antelope Valley-East Kern WA",
+                                       agencyname == "Santa Clarita Valley Water Agency" ~ "Santa Clarita Valley WA",
+                                       agencyname == "Coachella Valley Water District" ~ "Coachella Valley WD",
+                                       agencyname == "Crestline - Lake Arrowhead Water Agency" ~ "Crestline-Lake Arrowhead WA",
+                                       agencyname == "Desert Water Agency" ~ "Desert WA",
+                                       agencyname == "Littlerock Creek Irrigation District" ~ "Littlerock Creek ID",
+                                       agencyname == "Metropolitan Water District Of Southern California" ~ "Metropolitan WDSC",
+                                       agencyname == "Mojave Water Agency" ~ "Mojave WA",
+                                       agencyname == "Palmdale Water District" ~ "Palmdale WD",
+                                       agencyname == "San Bernardino Valley Municipal Water District" ~ "San Bernardino Valley MWD",
+                                       agencyname == "San Gabriel Valley Municipal Water District" ~ "San Gabriel Valley MWD",
+                                       agencyname == "San Gorgonio Pass Water Agency" ~ "San Gorgonio Pass WA",
+                                       agencyname == "Ventura County Watershed Protection District" ~ "Ventura County WPD",
+                                       TRUE ~ agencyname)) |> 
+  st_as_sf(geo_data, crs = 4326) |> 
+  ms_simplify(keep = 0.05, keep_shapes = TRUE) |>  #json file is too big so we are compressing
+  select(-c(last_edited_date, created_user, date_data_applies_to, last_edited_user)) |> 
+  glimpse()
+
+# Save cleaned & reduced version to a new file - already ran this once, no need to run again
+# st_write(swp_agencies, "data-raw/WaterDistricts_slimmed.geojson", 
+#          driver = "GeoJSON", 
+#          layer_options = "COORDINATE_PRECISION=5")
+```
+
+Plotting all polygons extracted from water districts database, that match SWP contractors 
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+leaflet(swp_agencies_geodata) |>
+  addTiles() |>
+  addPolygons(popup = ~agencyname, color = "blue", weight = 1)
+```
+
+
+```{r include=FALSE}
+# Binding geodata to SWP contracts data (should look the same that above).
+#  Using `maximum_annual_table_a_amount_acre_feet` for color palette 
+swp_contracts_w_locations <- swp_contracts_raw |> 
+  mutate(agency_name_clean = swp_contractors) |> 
+  left_join(swp_agencies_geodata, by = "agency_name_clean") |> 
+  select(-c(objectid, modifiedby, sourcecomments, global_id, created_date, lastmodifieddate)) |> 
+  glimpse()
+
+swp_contracts_w_locations <- st_as_sf(swp_contracts_w_locations)
+
+quantity_pal <- colorNumeric(palette = "viridis",
+                             domain = swp_contracts_w_locations$maximum_annual_table_a_amount_acre_feet ,
+                             na.color = "#cccccc")
+
+leaflet(swp_contracts_w_locations) |>
+  addTiles() |>
+  addPolygons(fillColor = ~quantity_pal(maximum_annual_table_a_amount_acre_feet),
+              weight = 1,
+              color = "#333333",
+              fillOpacity = 0.8,
+              popup = ~paste0("<strong>", agency_name_clean, "</strong><br>", "Max Annual Contract: ",
+                              maximum_annual_table_a_amount_acre_feet, "<br>")) |>
+  addLegend(position = "bottomright",
+            pal = quantity_pal,
+            values = swp_contracts_w_locations$maximum_annual_table_a_amount_acre_feet,
+            title = "Max Annual Contract",
+            opacity = 1)
+```
+
+
+# Contact info 
+
+This information was gathered from [CDW site](https://water.ca.gov/programs/state-water-project/management/swp-water-contractors) and was digitized manually
+
+Data cleaning includes: 
+
+  - Cleaning contractor names to match as listed on the contractor list above
+
+```{r echo=FALSE}
+contact_info <- read_csv("data-raw/SWP/SWP_contractors_info.csv") |>
+  clean_names() |> 
+  glimpse()
+```
+
+
+```{r include=FALSE}
+contractor_mapping <- c(
+  "Alameda County Flood Control and Water Conservation District Zone 7" = "Alameda County FC&WCD, Zone 7",
+  "Alameda County Water District" = "Alameda County WD",
+  "Antelope Valley-East Kern Water Agency" = "Antelope Valley-East Kern WA",
+  "City of Yuba City" = "City of Yuba City",
+  "Coachella Valley Water District" = "Coachella Valley WD",
+  "County of Butte" = "County of Butte",
+  "County of Kings" = "County of Kings",
+  "Mojave Water Agency" = "Mojave WA",
+  "Napa County Flood Control and Water Conservation District" = "Napa County FC&WCD",
+  "Plumas County Flood Control and Water Conservation District" = "Plumas County FC&WCD",
+  "San Bernardino Valley Municipal Water District" = "San Bernardino Valley MWD",
+  "San Luis Obispo County Flood Control and Water Conservation District" = "San Luis Obispo County FC&WCD",
+  "Santa Barbara County Flood Control and Water Conservation District" = "Santa Barbara County FC&WCD",
+  "Santa Clara Valley Water District" = "Santa Clara Valley WD",
+  "Santa Clarita Valley Water Agency (formerly Castaic Lake)" = "Santa Clarita Valley WA",
+  "Crestline-Lake Arrowhead Water Agency" = "Crestline-Lake Arrowhead WA",
+  "Desert Water Agency" = "Desert WA",
+  "Dudley Ridge Water District" = "Dudley Ridge WD",
+  "Empire West Side Irrigation District" = "Empire West Side ID",
+  "Kern County Water Agency" = "Kern County WA",
+  "Littlerock Creek Irrigation District" = "Littlerock Creek ID",
+  "Metropolitan Water District of Southern California" = "Metropolitan WDSC",
+  "Palmdale Water District" = "Palmdale WD",
+  "San Gabriel Valley Municipal Water District" = "San Gabriel Valley MWD",
+  "San Gorgonio Pass Water Agency" = "San Gorgonio Pass WA",
+  "Solano County Water Agency" = "Solano County WA",
+  "Tulare Lake Basin Water Storage District" = "Tulare Lake Basin WSD",
+  "Ventura County Flood Control District" = "Ventura County WPD",
+  "Oak Flat Water District" = "Oak Flat WD"
+)
+
+# adding a new column to match names
+contact_info <- contact_info |>
+  mutate(swp_name = recode(contractor, !!!contractor_mapping))
+
+swp_joined <- swp_contracts_w_locations |>
+  left_join(contact_info, by = c("swp_contractors" = "swp_name"))
+```
+
+# Plotting with all information in one data object - pop-up added
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+
+swp_clean <- swp_joined |> 
+  # mutate(organization_name = contractor,
+  #        beneficiary_type = NA,
+  #        beneficiary_importance_level = NA,
+  #        organization_address = NA,
+  #        contact_information = NA) |> 
+  select(contractor, region, maximum_annual_table_a_amount_acre_feet, 
+         approved_table_a_allocation_acre_feet, address, phone, fax, website, geometry) |> 
+  glimpse()
+
+
+leaflet(swp_clean) |>
+  addTiles() |>
+  addPolygons(fillColor = ~quantity_pal(maximum_annual_table_a_amount_acre_feet),
+              weight = 1,
+              color = "#333333",
+              fillOpacity = 0.8,
+              popup = ~paste0("<strong>", contractor, "</strong><br>", "<i>SWP Region: </i>",
+                              region, "<br>", "<i>Address: </i>",
+                              address, "<br>", "<i>Max Annual Contract: </i>",
+                              maximum_annual_table_a_amount_acre_feet, "<br>", "<i>Website: </i><a href='", website, "' target='_blank'>", website, "</a>")) |>
+  addLegend(position = "bottomright",
+            pal = quantity_pal,
+            values = swp_contracts_w_locations$maximum_annual_table_a_amount_acre_feet,
+            title = "Max Annual Contract",
+            opacity = 1)
+
+```
+
+
+```{r include=FALSE}
+swp <- swp_clean |> 
+  mutate(beneficiary_type = "swp contractor",
+         national_forest_connection = NA,
+         entity_name = contractor,
+         entity_address = address,
+         entity_contact = phone,
+         quantity_metric = maximum_annual_table_a_amount_acre_feet, #TODO do we want this field or "approved_table_a_allocation_acre_feet"
+         quantity_unit = "maximum annual quantity in acre feet") |> 
+  select(beneficiary_type, national_forest_connection, entity_name, entity_address,
+         entity_contact, quantity_metric, quantity_unit) |> 
+  glimpse()
+
+# save clean data
+saveRDS(swp, here::here("data", "swp.RDS"))
+```

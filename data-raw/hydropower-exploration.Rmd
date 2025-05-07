@@ -17,11 +17,10 @@ The purpose of this markdown is to get familiar with the dataset, identify any l
 
 Power plant data was sourced from the [U.S. Energy Atlas](https://atlas.eia.gov/datasets/bf5c5110b1b944d299bb683cdbd02d2a_0/explore?location=32.051243%2C61.504000%2C2.53)
 
-**Challenges:**
 
 ```{r, echo=FALSE}
 
-all_power_plants <- sf::read_sf(here::here('data-raw', 'shapefiles', 'Power_Plants', "Power_Plants.shp")) |> 
+all_power_plants <- sf::read_sf(here::here('data-raw', 'power_plants', "Power_Plants.shp")) |> 
   janitor::clean_names() |> 
   filter(state == "California") 
 

@@ -1,0 +1,158 @@
+---
+title: "Data Exploration - CA Drinking Water Systems "
+author: "Badhia Yunes Katz / Ashley Vizek"
+date: "April 18, 2025"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width=15, fig.height=10)
+library(leaflet)
+library(sf)
+library(tidyverse)
+library(janitor)
+```
+
+# Summary
+
+There are 4 relevant datasets to understanding public water systems:
+
+1. [Drinking water system area boundaries](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc)
+
+2. [Drinking water source facility locations](https://data.cnra.ca.gov/dataset/urban-water-data-drought/resource/9688aeb1-6c77-44aa-9cf7-6b1c1306f399).
+
+3. [Water supply and demand](https://data.ca.gov/dataset/drinking-water-public-water-system-annually-reported-water-production-and-delivery-information-2013/resource/ddac281d-4f71-45ba-99bd-394fa33d0e58).
+
+4. [Urban water retailer demand](https://data.ca.gov/dataset/urws-conservation-supply-demand).
+
+5. Spreadsheet shared to Ashley by (?) - `PWS_ID_Contractors`. This resource will be used to link PWS to the contracts (CVP, SWP CRA, AAC)
+
+# Overview 
+
+This markdown will pull and process as follows:
+
+  - The [Drinking water system area boundaries](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc) polygons will be use to visualize service area boundaries.
+  - Excel file `PWS_ID_Contractors` will be used to connect the PWS Id's to the contractors that deliver water, this will provide a relationship to a watershed, to then follow data processing and assign National Forest relationship
+  - [Urban water retailer demand](https://data.ca.gov/dataset/urws-conservation-supply-demand) and [Water supply and demand](https://data.ca.gov/dataset/drinking-water-public-water-system-annually-reported-water-production-and-delivery-information-2013/resource/ddac281d-4f71-45ba-99bd-394fa33d0e58) will be used to assign the amount/demand of water
+  
+
+```{r include=FALSE}
+# drinking water system boundaries #############################################
+dw_system_boundaries <- st_read("data-raw/drinking_water_systems/California_Drinking_Water_System_Area_Boundaries.shp") |> 
+  st_transform(crs = "+proj=longlat +datum=WGS84") |> 
+  clean_names()
+```
+
+
+```{r eval=FALSE, include=FALSE}
+leaflet(dw_system_boundaries) |>
+  addTiles() |>
+  addPolygons()
+```
+
+```{r}
+dw_system_boundaries <- dw_system_boundaries |>
+  st_make_valid() |>
+  st_transform(4326)
+dw_system_boundaries <- st_centroid(dw_system_boundaries)
+
+leaflet(dw_system_boundaries) |>
+  addTiles() |>
+  addCircles()
+
+```
+
+```{r}
+# 5. reading excel to link PWS to the contracts (CVP, SWP CRA, AAC)
+contractor_type_raw <- readxl::read_excel("data-raw/drinking_water_systems/PWS_ID_Contractors.xlsx") |> 
+  clean_names() |> 
+  glimpse()
+
+```
+
+```{r}
+
+water_beneficiaries_project_board <- pins::board_s3(bucket = "water-beneficiaries", region = "us-east-1")
+
+ear_filtered_water_demand <- water_beneficiaries_project_board |> 
+  pins::pin_read("ear_filtered_water_demand")
+
+# water_demand_uws_raw is from: https://data.ca.gov/dataset/urws-conservation-supply-demand
+water_demand_uws_raw <- read_csv("data-raw/drinking_water_systems/clearinghouse_report.csv")
+water_demand_uws <- water_demand_uws_raw |> 
+  janitor::clean_names() |> 
+  rename(pwsid = water_system_id) |> 
+  mutate(year = year(report_period_start_date),
+         month = month(report_period_start_date)) |> 
+  filter(year %in% c(2020:2024)) |> 
+  group_by(pwsid, month) |> 
+  summarize(potable_supply_gal = mean(potable_supply_minus_sold_gal, na.rm = T)) |> 
+  ungroup() |> 
+  group_by(pwsid) |> 
+  summarize(potable_supply_gal = sum(potable_supply_gal))
+
+water_demand <- ear_filtered_water_demand |> 
+  janitor::clean_names() |> 
+  group_by(pwsid, month) |> 
+  summarise(quantity_delivered_gallons = mean(calculated_quantity_in_gallons, na.rm = T)) |> 
+  ungroup() |> 
+  group_by(pwsid) |> 
+  summarize(quantity_delivered_gallons = sum(quantity_delivered_gallons, na.rm = T)) |> 
+  full_join(water_demand_uws) |> 
+  mutate(demand_gallons = ifelse((!is.na(potable_supply_gal) & potable_supply_gal >= 0), potable_supply_gal, quantity_delivered_gallons)) |> 
+  select(pwsid, demand_gallons)
+
+# There are some errors here. Assume that LA and EBMUD will have high demand but
+# others will not
+la_pwsid <- filter(ear_filtered_water_demand, grepl("LOS ANGELES", `Water.System.Name`)) |>  distinct(PWSID)
+la_pwsid <- la_pwsid$PWSID
+ebmud <- "CA0110005"
+water_demand_clean <- water_demand |> 
+  mutate(demand_gallons = case_when(!pwsid %in% c(la_pwsid, ebmud) & demand_gallons >= 9.328407e+10 ~ NA,
+                                    T ~ demand_gallons))
+  
+
+dw_system_demand <- left_join(dw_system_boundaries |> 
+                                 rename(pwsid = sabl_pwsid), water_demand_clean)
+#TODO note that this data will then be joined to geospatial source, just pulling it as a placeholder for now to
+# obtain the quantity metric
+```
+
+```{r eval=FALSE, include=FALSE}
+dw_system_contracts <- left_join(dw_system_demand, contractor_type_raw) |>  # joining just for visual purposes for now
+  glimpse()
+```
+
+```{r eval=FALSE, include=FALSE}
+colors <- c('orange', '#55CFD8FF', 'green', 'red', 'black')
+pal <- colorFactor(
+    palette = colors,
+    domain = dw_system_contracts$project)
+    
+leaflet(dw_system_contracts) |> 
+  addTiles() |> 
+  addPolygons(color = ~pal(project),
+              popup = ~paste("<strong>Entity ID:</strong>", pwsid, "<br>", "<strong>Entity Name:</strong>",
+                          water_sy_1, "<br>", "<strong>Delivery Contractor:</strong>", project))
+```
+
+#TODO notes:think through how to relate those dw systems that do not have a "project" assigned. (goal is to relate to a watershed, to then relate to NF. Continue processing pipeline)
+thoughts are: (1) we create a relationship guesstimating what infrastructure they are near to, or (2) assign spatial relationship based exclusively on the service area polygons.
+
+```{r}
+dws <- dw_system_demand |>
+  mutate(beneficiary_type = "drinking water system",
+         national_forest_connection = NA,
+         entity_name = water_sy_1,
+         entity_address = addr_line,
+         entity_contact = ac_phone_n,
+         quantity_metric = demand_gallons,
+         quantity_unit = "gallons") |>
+  select(beneficiary_type, national_forest_connection, entity_name, entity_address, entity_contact, quantity_metric, quantity_unit, pwsid) |>
+  glimpse() # keeping pwsid so that it can be used to relate to SWP and CVP contract on data processing 
+```
+
+Save RDS
+```{r}
+saveRDS(dws, here::here('data', 'drinking_water_boundaries.RDS'))
+```
+

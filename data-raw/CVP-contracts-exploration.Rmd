@@ -1,0 +1,547 @@
+---
+title: "Data Exploration - Central Valley Project (CVP) Water Contracts "
+author: "Badhia Yunes Katz"
+date: "04/02/2025"
+output: rmarkdown::html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, fig.width=15, fig.height=10)
+library(tidyverse)
+library(lubridate)
+library(readxl)
+library(janitor)
+library(dplyr)
+library(stringr)
+library(sf)
+library(leaflet)
+library(httr)
+```
+
+The purpose of this markdown is to get familiar with the CVP contracts dataset, identify any limitations, determine if it is useful and why, and any data processing that needs to be done.
+
+The CVP Water Contracts are publicly available on the [US Bureau of Reclamation Website](https://www.usbr.gov/mp/cvp-water/docs/latest-water-contractors.pdf) on a PDF format. 
+
+**Notes:**
+
+-  Maximum Contract Quantity represents contract amount at full build-out.
+- M&I Historical Use is computed based upon last 3 years of unconstrained CVP delivery for all contractors except Contra Costa Water District, Santa Clara, and Byron Bethany where historical use figure represents an amount agreed upon in contract renewal or other agreements with Reclamation.  
+- Contract Amount for Ag is calculated based upon Maximum Contract Quantity less M&I Historical Use, if any
+
+
+**Challenges:**
+
+- Water Contracts are on a PDF version, this is not machine readable 
+- Geodata is not publicly available
+- It was a challenge to find publicly available information from those CVP contractors that are not Water Districts or Counties
+
+**Decisions about geodata**
+
+- Since CVP contract list did not have any geo data available, it was sourced from different databases:
+
+  - [California State Geoportal - i03 WaterDistricts](https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore) 
+  - [California Department of Water Resources SGMA Portal](https://sgma.water.ca.gov/portal/gsa/print/302)
+  - [CAL Fire eGIS portal](https://hub-calfire-forestry.hub.arcgis.com/datasets/8713ced9b78a4abb97dc130a691a8695_0/explore) 
+
+
+- Some Contractor names are not clear on the boundary that they serve, or where they are located, therefore, they were not related to any geodata:
+
+    - "U.S. Department of Veteran Affairs", 
+    - "U.S. Forest Service", 
+    - "California, State of (Parks and Recreation)"
+    - "California, State of" 
+
+- We were unable to find geodata about the following contractors:
+
+    - "Dudley & Indart/Coelho/Hansen"
+    - "Lempesis, Virginia L-Trustee"
+    - "Meyers Farms Family Trust"
+    
+    
+- *Westlands Water District Distribution District 1* and *Westlands Water District Distribution District 2* were linked to *Westlands Water District* geospatial data
+
+
+## CVP Contracts extraction {.tabset}
+
+### CVP Water Contractors
+
+List was obtained from US Bureau of Reclamation Documents [here](https://www.usbr.gov/mp/cvp-water/docs/latest-water-contractors.pdf) and digitized to extract data
+
+```{r include=FALSE}
+cvp_1 <- read_csv("data-raw/CVP/CVP-water-contractors.csv") |> 
+  slice(2:7, 9, 11:13, 15:32, 34:41, 46:49, 51:53, 55, 60:103, 105:146, 148:188,
+        190:197, 199, 208:224, 226:233, 235:242, 244:245, 248:256, 264:267, 270:278,
+        284:331, 335, 337, 341, 345:346, 351:352) |> 
+  rename("Water_service_contract" = ...1) |>
+  clean_names() |> 
+  mutate(maximum_contract_quantity = x_1_maximum_contract_quantity |> 
+           str_replace_all(" ", "") |>
+           str_replace_all(",", "") |> 
+           str_replace_all("  ", "") |> 
+           as.numeric(),
+         historical_use = x_2_m_i_historical_use |> 
+           str_replace_all(" ", "") |> 
+           str_replace_all(",", "") |> 
+           as.numeric(),
+         contract_amount_for_ag = x_3_contract_amount_for_ag |>
+           str_replace_all(" ", "") |> 
+           str_replace_all(",", "") |> 
+           as.numeric()) |> 
+  select(-c(x_1_maximum_contract_quantity, x_2_m_i_historical_use, x_3_contract_amount_for_ag)) |> 
+  glimpse()
+```
+
+```{r echo=FALSE}
+DT::datatable(cvp_1, options = list(pageLength = 10,  scrollX = TRUE))
+```
+
+
+Visual to get a sense of Total Maximum Contract Quantity by Unit
+
+```{r, echo=FALSE}
+cvp_units_totals <- cvp_1 |> 
+  group_by(unit) |> 
+  summarize(total = sum(maximum_contract_quantity, na.rm = TRUE)) 
+
+ggplot(cvp_units_totals, aes(x = reorder(unit, -total), y = total)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Maximum Contract Quantity by Unit",
+    x = "Unit Name",
+    y = "Total Contract Quantity"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+unique(cvp_1$unit)
+```
+
+
+### Geo Data 
+
+#### Water Districts 
+
+Data was sourced from the California State Geoportal - i03 WaterDistricts available [here](https://gis.data.ca.gov/datasets/45d26a15b96346f1816d8fe187f8570d_0/explore) 
+
+Water Districts that are CVP contractors where extracted from this layer, below are all districts available
+
+```{r include=FALSE}
+geojson_path <- "data-raw/CVP/WaterDistricts.geojson"
+geo_data_wd <- st_read(geojson_path) |>
+  clean_names()
+
+# clean geodata agency names
+geo_data_wd <- st_read(geojson_path) |> 
+  clean_names() |> 
+  mutate(agencyname_clean = agencyname |>
+           str_to_lower() |>
+           str_replace_all("[[:punct:]]", " ") |>
+           str_replace_all("inc", "") |>
+           str_replace_all("\\s+", " ") |>
+           str_trim()) |> glimpse()
+
+# using just the names to see is there is match
+names_clean <- unique(geo_data_wd$agencyname_clean)
+```
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+leaflet(geo_data_wd) |>
+  addTiles() |>
+  addPolygons(color = "brown",
+              weight = 1,
+              fillOpacity = 0.2)
+```
+
+
+#### Oroloma
+
+Source: California Department of Water Resources - [SGMA Portal](https://sgma.water.ca.gov/portal/gsa/print/302) 
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+shp_path <- "data-raw/CVP/Oro_Loma_Water_District_boundary/Oro_Loma_Water_District.shp"
+oroloma_geo_data <- st_read(shp_path) |>
+  clean_names() |> 
+  mutate(agencyname_clean  = "oro loma water district") |> 
+  select(-c(raw_gsa_id, objectid))
+
+oroloma_geo_data_clean <- oroloma_geo_data |> 
+  st_as_sf() |> 
+  st_make_valid() |> 
+  st_transform(crs = 4326) 
+
+leaflet(oroloma_geo_data_clean) |>
+  addTiles() |>
+  addPolygons(color = "brown",
+              weight = 1,
+              fillOpacity = 0.2)
+```
+
+
+#### County boundaries
+
+These geospatial data is being used for those contractors that are listed as Counties. 
+Source: [CAL Fire eGIS portal](https://hub-calfire-forestry.hub.arcgis.com/datasets/8713ced9b78a4abb97dc130a691a8695_0/explore) 
+
+```{r include=FALSE}
+shp_path_co <- "data-raw/CVP/cvp_counties_shp/cnty19_1.shp"
+cvp_co_geo_data <- st_read(shp_path_co) |>
+  clean_names() |> 
+  rename(county_name = county_nam) |> 
+  glimpse()
+
+county_boundaries_swp <- cvp_co_geo_data |> 
+  st_as_sf() |> 
+  st_make_valid() |> 
+  st_transform(crs = 4326)
+```
+
+Plotting those counties of interest 
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+leaflet(county_boundaries_swp) |>
+  addTiles() |>
+  addPolygons(weight = 1,
+              color = "purple",
+              fillOpacity = 0.5,
+              popup = ~paste0("<strong>", county_name))
+```
+
+
+### Data cleaning / joining 
+
+#### joining to water districts geodata 
+
+```{r include=FALSE}
+# cvp_clean <- cvp_1|> 
+#   mutate(organization_name = water_service_contract,
+#          beneficiary_type = case_when(
+#            m_i == "X" & a_g == "X" ~ "municipal and industrial & agriculture",
+#            m_i == "X" ~ "municipal and industrial",
+#            a_g == "X" ~ "agriculture",
+#            TRUE ~ "not Specified"),
+#          beneficiary_importance_level = NA,
+#          organization_address = NA,
+#          contact_information = NA) |>  
+#   glimpse()
+
+# quick check to add info later
+# cvp_clean |> filter(beneficiary_type == not Specified") |> view()
+```
+
+```{r include=FALSE}
+# cleaning cvp water service contract names 
+cvp_clean <- cvp_1 |>
+  mutate(water_service_clean = water_service_contract |>
+           str_to_lower() |>
+           str_replace_all("[[:punct:]]", " ") |>
+           str_replace_all("\\binc\\b", "") |>
+           str_replace_all("\\s+", " ") |>
+           str_trim())
+# filtering out Sacramento River Water Rights Settlement 
+cvp_filtered <- cvp_clean |>
+  filter(unit != "Sac.R. Water Rights Settlement",
+         unit != "Sac. R. Water Rights\rSettlement/Shasta") |>
+  glimpse()
+
+# figuring out which names match the water districts geodata 
+cvp_filtered |> 
+  filter(water_service_clean %in% names_clean) |> view()
+
+# figuring out which names DONT match the water districts geodata 
+cvp_filtered |> 
+  filter(!water_service_clean %in% names_clean) |> 
+  select(water_service_clean) |> 
+  view()
+
+# modifying some names from the contracts, so that they match water district names in geodata
+cvp_clean_names <- cvp_filtered |>
+  mutate(agencyname_clean = case_when(water_service_clean == "central san joaquin water conservation dist" ~ "central san joaquin water conservation district",
+                                      water_service_clean == "coelho family trust 10" ~ "coelho family trust",
+                                         # water_service_clean == "colusa county of" ~ ?,
+                                      water_service_clean == "colusa county of stonyford" ~ "county of colusa stonyford",
+                                      water_service_clean == "contra costa water district 12" ~ "contra costa water district",
+                                      water_service_clean == "central san joaquin water conservation dist" ~ "central san joaquin water conservation district",
+                                      water_service_clean == "davis water district" ~ "davis water district from usbr",
+                                      water_service_clean == "fresno county water works district no 18" ~ "fresno county waterworks district no 18",
+                                      water_service_clean == "fresno slough water district 10" ~ "fresno slough water district",
+                                      water_service_clean == "fresno city of" ~ "fresno city of service area",
+                                      water_service_clean == "gravelly ford water district" ~ "gravely ford water district",
+                                      water_service_clean == "james irrigation district 10" ~ "james irrigation district",
+                                      water_service_clean == "kanawha wd" ~ "kanawha water district",
+                                      water_service_clean == "reclamation district no 1606 10" ~ "reclamation district no 1606",
+                                      water_service_clean == "the west side irrigation district" ~ "west side irrigation district",
+                                      water_service_clean == "tracy city of" ~ "tracy city of water service", 
+                                      water_service_clean == "tranquillity irrigation district" ~ "tranquility irrigation district",
+                                      water_service_clean == "tranquillity irrigation district 10" ~ "tranquility irrigation district",
+                                      water_service_clean %in% c("tranquillity public utility district", "tranquillity public utility district 10") ~ "tranquility public utility district",
+                                      water_service_clean == "u s forest service salt creek" ~ "us forest service salt creek",
+                                      water_service_clean == "byron bethany irrigation district 1" ~ "byron bethany irrigation district",
+                                      water_service_clean == "dunnigan wd" ~ "dunnigan water works",
+                                      water_service_clean == "westlands water district assigned from oro loma" ~ "westlands water district",
+                                      water_service_clean == "patterson irrigation district 6" ~ "patterson water district",
+                                      water_service_clean == "sacramento county assignment from smud" ~ "sacramento municipal utility district",
+                                         TRUE ~ water_service_clean))
+  # filter(water_service_clean %in% names_clean) |>
+
+
+# cvp_clean_names |> 
+#   filter(agencyname_clean %in% names_clean) |> 
+#   select(agencyname_clean) |> 
+#   view()
+
+# check for names that match the water districts geodata after modifications
+cvp_clean_names |> 
+  filter(agencyname_clean %in% names_clean) |> 
+  select(agencyname_clean) |> 
+  # distinct() |>
+  view()
+
+#TODO these agency names are not working to link - mostly we are not able to link due to water service not being on water district database, OR lack of clarity on right district (e.g Madera County - water district has multiple madera county districts, so it is confusing)
+cvp_clean_names |> 
+  filter(!agencyname_clean %in% names_clean) |> 
+  # select(agencyname_clean, unit) |> 
+  # distinct() |> 
+  view()
+```
+
+```{r include=FALSE}
+# joining the water districts geodata to cvp contracts - keeping fields of interest
+cvp_w_locations <- cvp_clean_names |>
+  left_join(geo_data_wd, by = "agencyname_clean") |> 
+  glimpse()
+  
+cvp_w_locations <- cvp_w_locations |> 
+  mutate(agencyname_clean =
+           case_when(agencyname_clean == "westlands water district" ~ "westlands water district assigned from oro loma",
+                     water_service_clean == "patterson water district" ~ "patterson irrigation district 6",
+                     TRUE ~ agencyname_clean),
+         organization_name = water_service_contract,
+         beneficiary_type = case_when(
+           m_i == "X" & a_g == "X" ~ "municipal and industrial & agriculture",
+           m_i == "X" ~ "municipal and industrial",
+           a_g == "X" ~ "agriculture",
+           TRUE ~ "not Specified"),
+         m_i_historical_use = historical_use) |>
+  select(water_service_contract, agencyname_clean, agencyuniqueid, cvp_division, unit, beneficiary_type, contract_no, contract_expiration_year, maximum_contract_quantity, m_i_historical_use, contract_amount_for_ag, geometry ) |>
+  glimpse()
+```
+```{r eval=FALSE, include=FALSE}
+# those that still dont have geodata
+cvp_w_locations |>
+  filter(st_is_empty(geometry)) |> 
+  view()
+```
+
+```{r}
+# adding westlands water district 
+westlands_wd <- geo_data_wd |>
+  filter(agencyname_clean == "westlands water district") |> 
+  st_union() |>
+  st_sfc(crs = st_crs(cvp_w_locations))
+
+cvp_w_locations$geometry[cvp_w_locations$agencyname_clean == "westlands water district" |
+                         cvp_w_locations$agencyname_clean == "westlands water district distribution district 1" |
+                         cvp_w_locations$agencyname_clean =="westlands water district distribution district 2"] <- westlands_wd
+
+```
+
+
+#### joining county boundaries
+
+```{r include=FALSE}
+# cleaning county geodata to join with cvp contracts 
+county_boundaries_swp <- county_boundaries_swp |> 
+  mutate(agencyname_clean = case_when(county_name == "Colusa" ~ "colusa county of",
+                                      county_name == "Fresno" ~ "fresno county of",
+                                      county_name == "Madera" ~ "madera county of",
+                                      county_name ==  "Tulare" ~ "tulare county of",
+                                      TRUE ~ county_name)) |> 
+  select(county_name, agencyname_clean, geometry) |> 
+  glimpse()
+```
+
+
+```{r}
+# joining the county geodata to cvp contracts - only colusa, fresno, madera and tulare
+cvp_w_locations_2 <- cvp_w_locations |> 
+  left_join(county_boundaries_swp |> 
+              select(agencyname_clean, geometry_fill = geometry), by = "agencyname_clean") |> 
+  mutate(geometry = ifelse(st_is_empty(geometry), geometry_fill, geometry)) |>
+  select(-geometry_fill) |> 
+  st_as_sf() |> 
+  glimpse()
+```
+
+```{r eval=FALSE, include=FALSE}
+# checking for empty geometries
+cvp_w_locations_2 |>
+  filter(st_is_empty(geometry)) |>
+  view()
+```
+
+#### joining oro loma
+
+This layer is being sources separately because no information about Oro Loma Water District was available on Water Districts DB.
+
+```{r}
+oroloma_geom <- oroloma_geo_data_clean |>
+  st_union() |>
+  st_sfc(crs = st_crs(cvp_w_locations_2))  
+
+cvp_w_locations_2$geometry[cvp_w_locations_2$agencyname_clean == "oro loma water district"] <- oroloma_geom
+
+```
+
+#### exception joins
+
+- Water contractor listed as: "Pajaro Valley WMA, Santa Clara VWD", both polygons will be related to these entry
+- Water contractor listed as: "Pajaro Valley WMA, Westlands WD", both polygons will be related to these entry
+
+```{r}
+pv_sc <- geo_data_wd |> 
+  filter(agencyname == "Pajaro Valley Water Management Agency" |
+         agencyname ==  "Santa Clara Valley Water District") |> 
+    st_union() |>
+  st_sfc(crs = st_crs(cvp_w_locations_2))
+
+cvp_w_locations_2$geometry[cvp_w_locations_2$agencyname_clean == "pajaro valley wma santa clara vwd"] <- pv_sc
+
+
+pv_wl <- geo_data_wd |> 
+  filter(agencyname == "Pajaro Valley Water Management Agency" |
+         agencyname ==  "Westlands Water District") |> 
+  st_union() |>
+  st_sfc(crs = st_crs(cvp_w_locations_2)) 
+
+cvp_w_locations_2$geometry[cvp_w_locations_2$agencyname_clean == "pajaro valley wma westlands wd"] <- pv_wl
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+# checking for empty geometries
+cvp_w_locations_2 |>
+  filter(st_is_empty(geometry)) |>
+  view()
+```
+
+### Plots
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+# Trying different plotting visuals
+beneficiary_palette <- colorFactor(palette = "Set2", domain = cvp_w_locations_2$beneficiary_type)
+
+cvp_centroids <- cvp_w_locations_2 |> 
+  st_centroid()
+
+coords <- cvp_centroids |> 
+  st_coordinates()
+
+cvp_centroids <- cvp_centroids |> 
+  mutate(lng = coords[, 1],
+         lat = coords[, 2])
+
+max_quantity <- max(cvp_w_locations_2$maximum_contract_quantity, na.rm = TRUE)
+cvp_centroids <- cvp_centroids |> 
+  mutate(radius = (maximum_contract_quantity / max_quantity) * 20 + 3) |> 
+  st_drop_geometry()
+
+
+leaflet(cvp_w_locations_2) |>
+  addTiles() |>
+  # addPolygons(color = "brown",
+  #             weight = 1,
+  #             fillOpacity = 0.2,
+  #             popup = ~paste0("<strong>", agencyname_clean, "</strong><br>", "Beneficiary: ", beneficiary_type, "<br>",
+  #                             "Max Contract: ", maximum_contract_quantity)) |>
+  addCircleMarkers(data = cvp_centroids,
+                   lng = ~lng,
+                   lat = ~lat,
+                   color = ~beneficiary_palette(beneficiary_type),
+                   radius = ~radius,
+                   fillOpacity = 0.9,
+                   stroke = FALSE,
+                   popup = ~paste0("<strong>", agencyname_clean, "</strong><br>",
+                                   "Beneficiary: ", beneficiary_type, "<br>",
+                                   "Max Contract: ", maximum_contract_quantity)) |>
+  addLegend("bottomright", 
+            pal = beneficiary_palette,
+            values = cvp_w_locations_2$beneficiary_type,
+            title = "Beneficiary Type",
+            opacity = 1)
+
+```
+
+
+```{r fig.height=6, fig.width=8, include=FALSE}
+quantity_pal <- colorNumeric( palette = "viridis",
+  domain = cvp_w_locations_2$maximum_contract_quantity,
+  na.color = "#cccccc")
+
+leaflet(cvp_w_locations_2) |>
+  addTiles() |>
+  addPolygons(fillColor = ~quantity_pal(maximum_contract_quantity),
+              weight = 1,
+              color = "#333333",
+              fillOpacity = 0.8,
+              popup = ~paste0("<strong>", agencyname_clean , "</strong><br>", "Max Contract: ", maximum_contract_quantity, "<br>",
+                              "Beneficiary: ", beneficiary_type)) |>
+  addLegend(position = "bottomright",
+            pal = quantity_pal,
+            values = cvp_w_locations$maximum_contract_quantity,
+            title = "Max Contract",
+            opacity = 1)
+
+```
+
+
+```{r echo=FALSE, fig.height=6, fig.width=8}
+agency_names <- unique(cvp_w_locations_2$agencyname_clean)
+
+map <- leaflet() |>
+  addTiles()
+
+for (agency in agency_names) {
+  map <- map |> addPolygons(data = filter(cvp_w_locations_2, agencyname_clean == agency),
+                            fillColor = ~quantity_pal(maximum_contract_quantity),
+                            weight = 1,
+                            color = "#333333",
+                            fillOpacity = 0.8,
+                            group = agency,
+                            popup = ~paste0("<strong>", agencyname_clean, "</strong><br>",
+                                            "Max Contract: ", maximum_contract_quantity, "<br>",
+                                            "Beneficiary: ", beneficiary_type))
+  }
+map |>
+  addLegend(position = "bottomright",
+            pal = quantity_pal,
+            values = cvp_w_locations_2$maximum_contract_quantity,
+            title = "Max Contract",
+            opacity = 1) |>
+  addLayersControl(overlayGroups = agency_names,
+                   options = layersControlOptions(collapsed = FALSE))
+```
+
+```{r include=FALSE}
+#save clean data 
+glimpse(cvp_w_locations_2)
+
+cvp <- cvp_w_locations_2 |> 
+  mutate(beneficiary_type = "cvp contractor",
+         national_forest_connection = NA,
+         entity_name = water_service_contract,
+         entity_address = NA,
+         entity_contact = NA,
+         quantity_metric = maximum_contract_quantity,
+         quantity_unit = "maximum contract quantity",
+         cvp_unit_name = unit) |> # keeping unit name for now, this field will be used to assign nf
+  select(beneficiary_type, national_forest_connection, entity_name, entity_address,
+         entity_contact, quantity_metric, quantity_unit, cvp_unit_name) |> 
+  glimpse()
+
+```
+
+
+```{r}
+# save clean data
+saveRDS(cvp, here::here("data", "cvp.RDS"))
+```
+

@@ -12,7 +12,7 @@ nf_raw <- read_sf(here::here('data-raw', 'shapefiles', 'nf_boundaries', 'S_USA.N
   filter(nfslandu_1 == "National Forest") |>
   glimpse()
 
-unique(nf_bounds$nfslandu_2)
+unique(nf_raw$nfslandu_2)
 
 names <- c('Klamath National Forest',
            'Lassen National Forest',
@@ -21,10 +21,10 @@ names <- c('Klamath National Forest',
            'Modoc National Forest',
            'Six Rivers National Forest')
 
+
 nf_bounds <- nf_raw |>
   filter(nfslandu_2 %in% names) |>
   select(name = nfslandu_2, hq_location = hq_locatio, geometry) |>
-  mutate(name = ifelse(name == "Shasta National Forest", "Shasta-Trinity National Forest", name)) |>
   st_transform("+proj=longlat +datum=WGS84") |>
   glimpse()
 
