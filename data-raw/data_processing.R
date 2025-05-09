@@ -126,11 +126,29 @@ dws_contractor_type_raw <- readxl::read_excel("data-raw/drinking_water_systems/P
   janitor::clean_names()
 
 dws_projects <- left_join(dws_clean, dws_contractor_type_raw) |>
-  select(-pwsid, -district) |>
+  # select(-pwsid, -district) |>
+  glimpse()
+
+# reading data to find facility type, for those that are permanent and consecutive connection we will
+# relate to the same NF than SWP and CVP
+facility_location_raw <- read_csv("data-raw/drinking_water_systems/source_name.csv")
+facility_location <- facility_location_raw |>
+  distinct(pwsid, source_facility_id, .keep_all = T) |>
+  select(pwsid, source_facility_availability, source_facility_type) |>
+  filter(source_facility_type == "consecutive connection" &
+           source_facility_availability == "permanent") |>
+  mutate(national_forest_connection = list(c("Shasta National Forest",
+                                             "Lassen National Forest",
+                                             "Klamath National Forest",
+                                             "Six Rivers National Forest"))) |>
+  unnest(national_forest_connection)
+
+dws <- left_join(dws_projects, facility_location_raw) |>
+  # select(-pwsid, -district) |>
   glimpse()
 
 # binding all datasets to process -----------------------------------------
-all_datasets_raw <- bind_rows(hydropower, swp, dws_projects, water_rights) |>
+all_datasets_raw <- bind_rows(hydropower, swp, dws, water_rights) |>
   st_make_valid()
 
 # processing to find NF relationship --------------------------------------
@@ -168,10 +186,6 @@ dws_cvp_forests <- c("Shasta National Forest", "Lassen National Forest",
                  "Klamath National Forest", "Six Rivers National Forest")
 
 ## (4) additional manual processing
-# nf's that will be related to dw systems (those that have cvp project relationship)
-dws_cvp_forests <- c("Shasta National Forest", "Lassen National Forest",
-                     "Klamath National Forest", "Six Rivers National Forest")
-
 dws_cvp_expand_rows <- all_datasets_results_raw |>
   filter(is.na(national_forest_connection),
          beneficiary_type == "drinking water system",
@@ -198,8 +212,8 @@ remaining <- all_datasets_results_raw |>
 
 # combining all results
 all_datasets_results <- bind_rows(remaining, fallback_assigned, dws_cvp_expanded) |>
-  select(beneficiary_type, entity_name, entity_contact, entity_address, quantity_metric, quantity_unit,
-         latitude, longitude, watershed_name, huc6, national_forest_connection)
+  select(beneficiary_type, entity_name, entity_contact, entity_address, quantity_metric, quantity_unit, national_forest_connection,
+         watershed_name, huc6, latitude, longitude)
 
 
 # splitting points and polygons for plotting purposes
