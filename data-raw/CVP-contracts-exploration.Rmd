@@ -531,7 +531,7 @@ cvp <- cvp_w_locations_2 |>
          entity_address = NA,
          entity_contact = NA,
          quantity_metric = maximum_contract_quantity,
-         quantity_unit = "maximum contract quantity",
+         quantity_unit = "acre-feet",
          cvp_unit_name = unit) |> # keeping unit name for now, this field will be used to assign nf
   select(beneficiary_type, national_forest_connection, entity_name, entity_address,
          entity_contact, quantity_metric, quantity_unit, cvp_unit_name) |> 
