@@ -294,7 +294,7 @@ swp <- swp_clean |>
          entity_address = address,
          entity_contact = phone,
          quantity_metric = maximum_annual_table_a_amount_acre_feet, #TODO do we want this field or "approved_table_a_allocation_acre_feet"
-         quantity_unit = "maximum annual quantity in acre feet") |> 
+         quantity_unit = "acre-feet") |> 
   select(beneficiary_type, national_forest_connection, entity_name, entity_address,
          entity_contact, quantity_metric, quantity_unit) |> 
   glimpse()
