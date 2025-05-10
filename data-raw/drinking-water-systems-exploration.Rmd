@@ -70,7 +70,22 @@ contractor_type_raw <- readxl::read_excel("data-raw/drinking_water_systems/PWS_I
 ```
 
 ```{r}
+# Drinking water source facility locations ###################################################
+# We will use this dataset to filter drinking water systems that may have sources in
+# the area of interest, code below is exploratory. This same criteria will be used on data_processing
+# to assign NF to those public water systems that are source_facility_type == "consecutive connection" &          source_facility_availability == "permanent"
+facility_location_raw <- read_csv("data-raw/drinking_water_systems/source_name.csv") 
+facility_location <- facility_location_raw |> 
+  distinct(pwsid, source_facility_id, .keep_all = T) |> 
+  filter(!is.na(latitude), !is.na(longitude)) 
+# filter to watershed
+facility_filtered <- facility_location |>
+  select(pwsid, source_facility_availability, source_facility_type) |> 
+  filter(source_facility_type == "consecutive connection" & 
+           source_facility_availability == "permanent") 
+```
 
+```{r}
 water_beneficiaries_project_board <- pins::board_s3(bucket = "water-beneficiaries", region = "us-east-1")
 
 ear_filtered_water_demand <- water_beneficiaries_project_board |> 
@@ -113,8 +128,6 @@ water_demand_clean <- water_demand |>
 
 dw_system_demand <- left_join(dw_system_boundaries |> 
                                  rename(pwsid = sabl_pwsid), water_demand_clean)
-#TODO note that this data will then be joined to geospatial source, just pulling it as a placeholder for now to
-# obtain the quantity metric
 ```
 
 ```{r eval=FALSE, include=FALSE}
