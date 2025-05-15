@@ -302,3 +302,14 @@ swp <- swp_clean |>
 # save clean data
 saveRDS(swp, here::here("data", "swp.RDS"))
 ```
+
+```{r eval=FALSE, include=FALSE}
+#generating shapefile
+# st_crs(swp) <- 4326  
+# swp <- st_transform(swp, 26910)  
+
+# st_write(swp, "data-raw/shapefiles/swp_boundaries/swp_locations_shapefile.shp", delete_layer = TRUE)
+
+# note that in order to make the shapefile compatible with ArcGIS it was processed in ArcGIS and save in repo under swp_boundaries_gis_compatible
+```
+

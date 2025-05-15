@@ -540,6 +540,15 @@ cvp <- cvp_w_locations_2 |>
 ```
 
 
+```{r eval=FALSE, include=FALSE}
+# st_crs(cvp) <- 4326  
+# cvp <- st_transform(cvp, 26910)  
+# 
+# st_write(cvp, "data-raw/shapefiles/cvp_boundaries/cvp_locations_shapefile.shp", delete_layer = TRUE)
+# note that in order to make the shapefile compatible with ArcGIS it was processed in ArcGIS and save in repo under cvp_boundaries_gis_compatible
+```
+
+
 ```{r}
 # save clean data
 saveRDS(cvp, here::here("data", "cvp.RDS"))
