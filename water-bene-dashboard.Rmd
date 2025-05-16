@@ -30,12 +30,10 @@ nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
 watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 
 all_datasets <- readRDS(here::here("data", "all_datasets_results.RDS")) 
+planned_restoration <- readRDS(here::here("data", "planned_restoration.RDS"))
 ```
 
 ```{r}
-#TODO - check this createria since not sure it is working the way we think
-#MW: I think it's working but since the quantity metric is do different among the datasets, it filters
-#weird. Adding a group by dataset when it's none. 
 filter_by_metric <- function(data, column, metric) {
   if (metric == "None") {
     return(data)
@@ -71,7 +69,7 @@ conditionalPanel(
     inputId = 'select_huc',
     label = tags$strong('Select watershed to identify connected benficiaries'),
     choices = c(unique(all_datasets$watershed_name)),
-    selected = "Upper Sacramento") # TODO: placeholder
+    selected = "Upper Sacramento") 
 )
 
 conditionalPanel(
@@ -93,6 +91,13 @@ selectInput(
               "Hydropower facility" = "hydropower",
               "Drinking water system" = "dws"),
   selected = "all"
+)
+
+radioButtons(
+  inputId = "show_restoration",
+  label = tags$strong("Show planned restoration"),
+  choices = c("Yes", "No"),
+  selected = "Yes"
 )
 
 radioButtons(
@@ -156,11 +161,34 @@ filtered_dataset <- reactive({
   return(data)
 })
 
+filtered_restoration <- reactive({
+  req(input$select_huc_or_nf, input$show_restoration)
+  
+  if(input$show_restoration == "Yes") {
+    
+    if (input$select_huc_or_nf == "National Forest" && 
+        !is.null(input$select_nf) && input$select_nf != "All") {
+      data <- planned_restoration |> filter(national_forest_connection == input$select_nf)
+    }
+    
+    if (input$select_huc_or_nf == "Watershed (HUC6)" && 
+        !is.null(input$select_huc) && input$select_huc != "All") {
+      data <- planned_restoration |> filter(watershed_name == input$select_huc)
+    }
+  } else {
+    data <- planned_restoration |> slice(0)
+  }
+  
+  return(data)
+})
+
 ```
 
 ```{r}
 observe({
-  req(input$select_bene, input$select_metric)
+  req(input$select_bene, input$select_metric, input$show_restoration)
+  
+  filtered_restoration() |> glimpse()
   
   tmp_data <- filtered_dataset() |>
     filter_by_metric(quantity_metric, input$select_metric) |>
@@ -216,16 +244,63 @@ observe({
                      stroke = TRUE,
                      weight = 1,
                      fillOpacity = 0.8,
-                     popup = popup_content) |> 
-    addLegend("bottomright",
-              pal = bene_pal,
-              values = all_points$beneficiary_type,
-              title = "Beneficiary Type",
-              opacity = 1) |> 
+                     popup = popup_content,
+                     group = "bene") |> 
+    # addCircleMarkers(data = filtered_restoration(),
+    #                  radius = 6,
+    #                  color  = "darkblue",
+    #                  stroke = FALSE,
+    #                  fillOpacity = 0.8,
+    #                  popup  = ~paste0(
+    #                    "<strong>Project Name:</strong> ", project_name, "<br/>",
+    #                    "<strong>Timing:</strong> ", timing_plan, "<br/>",
+    #                    "<strong>Contact:</strong> ", contact, "<br/",
+    #                    "<strong>National Forest:</strong> ", 
+    #                    ifelse(is.na(national_forest_connection), "None", national_forest_connection), "<br/>",
+  #                    "<strong>Watershed:</strong> ", watershed_name),
+  #                  group = "restoration"
+  # ) |>  
+  addLegend("bottomright",
+            pal = bene_pal,
+            values = all_points$beneficiary_type,
+            title = "Beneficiary Type",
+            opacity = 1,
+            group = "bene") |> 
     addLayersControl(
       baseGroups = c("Default", "Greyscale", "Imagery"),
       options = layersControlOptions(collapsed = FALSE)
     )
+})
+
+observe({
+  proxy <- leafletProxy("map") 
+  
+  if (nrow(filtered_restoration()) > 0) {
+    proxy <- proxy |>
+      addCircleMarkers(
+        data        = filtered_restoration(),
+        radius      = 6,
+        color       = "darkblue",
+        stroke      = FALSE,
+        fillOpacity = 0.8,
+        popup       = ~paste0(
+          "<strong>Project Name:</strong> ", project_name, "<br/>",
+          "<strong>Timing:</strong> ", timing_plan, "<br/>",
+          "<strong>Contact:</strong> ", contact, "<br/>",
+          "<strong>National Forest:</strong> ",
+          ifelse(is.na(national_forest_connection), "None", national_forest_connection), "<br/>",
+          "<strong>Watershed:</strong> ", watershed_name
+        ),
+        group = "restoration"
+      ) |>
+      addLegend(
+        position = "bottomright",
+        colors   = "darkblue",
+        labels   = "Planned Restoration",
+        group    = "restoration",
+        opacity  = 1
+      )
+  }
 })
 
 observe({
@@ -249,12 +324,14 @@ observe({
                                   weight = 1,
                                   popup = ~name)
   }
+  
 })
+
 leafletOutput("map", height = "600px")
 
 ```
 
-### Catalog 
+### Beneficiaries Catalog 
 
 ```{r}
 div(downloadButton("download_catalog", "Download Catalog Selection")
@@ -300,9 +377,49 @@ output$download_catalog <- downloadHandler(
 )
 ```
 
-### Summary 
+### Planned Restoration Catalog
 
-<!-- Summary plot of the top entities by each beneficiary type, grouped by the selected national forest boundary and totaled by alike entity names.  -->
+```{r}
+div(downloadButton("download_restoration_catalog", "Download Restoration Selection")
+)
+div(style = "height: 720px; overflow-y: auto;",
+    DTOutput("restoration_catalog")
+)
+```
+
+```{r}
+output$restoration_catalog <- renderDT({
+
+  tmp_data <- filtered_restoration() |>
+    st_drop_geometry() |> 
+    select(-dataset) |> 
+    rename(timing = timing_plan) |> 
+    rename_with(~ tools::toTitleCase(gsub("_", " ", .x)))
+  
+  datatable(tmp_data,
+            options = list(
+              pageLength = 10,
+              searching = TRUE,
+              ordering = TRUE,
+              paging = TRUE,
+              lengthChange = TRUE)
+  )
+})
+
+output$download_restoration_catalog <- downloadHandler(
+  filename = function() {
+    paste0("restoration_catalog_", Sys.Date(), ".csv")
+  },
+  content = function(file) {
+    tmp_data <- filtered_restoration() |>
+      st_drop_geometry()
+    
+    write.csv(tmp_data, file, row.names = FALSE)
+  }
+)
+```
+
+### Summary 
 
 ```{r}
 plotOutput("top_contractors_plot")
@@ -338,8 +455,8 @@ output$top_contractors_plot <- renderPlot({
       )
     ) +    
     labs(title = "Top 10 Contractors by Quantity",
-                x = "",
-                y = "Quantity Metric") +
+         x = "",
+         y = "Quantity Metric") +
     theme(
       legend.position = "none",   
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
@@ -348,6 +465,8 @@ output$top_contractors_plot <- renderPlot({
     facet_grid(~beneficiary_type, scales = "free_x")
 })
 ```
+
+
 
 
 

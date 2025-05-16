@@ -139,6 +139,7 @@ planned_restoration <- bind_rows(cal_vtp_clean,
   filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) |> 
   glimpse()
 
+saveRDS(planned_restoration, here::here("data", "planned_restoration.RDS"))
 
 ```
 
