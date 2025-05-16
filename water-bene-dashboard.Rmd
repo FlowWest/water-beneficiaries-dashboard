@@ -10,6 +10,7 @@ resource_files:
 - data/watersheds.RDS
 - data/all_datasets_results.RDS
 - data/nf_boundaries.RDS
+- data/planned_restoration.RDS
 ---
 
 ```{r setup, include=FALSE}
@@ -246,20 +247,6 @@ observe({
                      fillOpacity = 0.8,
                      popup = popup_content,
                      group = "bene") |> 
-    # addCircleMarkers(data = filtered_restoration(),
-    #                  radius = 6,
-    #                  color  = "darkblue",
-    #                  stroke = FALSE,
-    #                  fillOpacity = 0.8,
-    #                  popup  = ~paste0(
-    #                    "<strong>Project Name:</strong> ", project_name, "<br/>",
-    #                    "<strong>Timing:</strong> ", timing_plan, "<br/>",
-    #                    "<strong>Contact:</strong> ", contact, "<br/",
-    #                    "<strong>National Forest:</strong> ", 
-    #                    ifelse(is.na(national_forest_connection), "None", national_forest_connection), "<br/>",
-  #                    "<strong>Watershed:</strong> ", watershed_name),
-  #                  group = "restoration"
-  # ) |>  
   addLegend("bottomright",
             pal = bene_pal,
             values = all_points$beneficiary_type,
@@ -392,7 +379,6 @@ output$restoration_catalog <- renderDT({
 
   tmp_data <- filtered_restoration() |>
     st_drop_geometry() |> 
-    select(-dataset) |> 
     rename(timing = timing_plan) |> 
     rename_with(~ tools::toTitleCase(gsub("_", " ", .x)))
   

@@ -25,11 +25,13 @@ watersheds <- readRDS(here::here("data", "watersheds.RDS"))
 
 Three datasets were provided by SIG:
 
--   SOPA Forest Management
+-   [SOPA Forest Management](https://www.fs.usda.gov/sopa/index.php)
 
--   CalVTP Proposed Projects
+-   [CalVTP Proposed
+    Projects](https://calfire-umb05.azurewebsites.net/projects-and-programs/calvtp-homepage-and-storymap/)
 
--   USFS NEPA Planned Projects
+-   [USFS NEPA Planned
+    Projects](https://data.fs.usda.gov/geodata/edw/datasets.php)
 
 Due to size constraints, all raw data is stored here:
 <https://drive.google.com/drive/u/0/folders/1EPi8wEZatXhZZfhvTjTcUZjuKSINT3o7>
@@ -59,7 +61,7 @@ sopa_sf_clean <- sopa_sf |>
          watershed_name = Name,
          timing_plan = Decision, 
          contact = Project_co) |> 
-  mutate(dataset = 'SOPA_Forest_Management_Scrape_Forest_HUC') |> 
+  mutate(dataset = 'USFS SOPA') |> 
   glimpse()
 
 ```
@@ -69,11 +71,11 @@ sopa_sf_clean <- sopa_sf |>
 **Challenges/Notes**
 
 -   I have the dataset filtered to either falling within the HUC6
-watersheds OR the national forest boundaries. There are many more
-connections with the HUC6 than the forest boundaries so when
-integrated in the application, it will very few planned restorations
-for selected national forests. Most of the national forest column is
-`NA`.
+    watersheds OR the national forest boundaries. There are many more
+    connections with the HUC6 than the forest boundaries so when
+    integrated in the application, it will very few planned restorations
+    for selected national forests. Most of the national forest column is
+    `NA`.
 
 ```{r}
 # CalVTP
@@ -89,7 +91,7 @@ cal_vtp_clean <- cal_vtp_raw |>
          watershed_name = CalVTP_P_8,
          timing_plan = L0CalVTP_8, 
          contact = L0CalVTP_5) |> 
-  mutate(dataset = 'CalVTP_ProposedProjects_Pnt_Scrape_Forest_HUC1') |> 
+  mutate(dataset = 'CalVTP') |> 
   glimpse()
 
 ```
@@ -99,10 +101,10 @@ cal_vtp_clean <- cal_vtp_raw |>
 **Notes**
 
 -   Unsure what `rev_date` refers to but assuming that it is not the
-timing for the planned project. Unsure timing so leaving it as `NA`
+    timing for the planned project. Unsure timing so leaving it as `NA`
 
 -   To remain consistent with the other two datasets, took the centroid
-of the polygons
+    of the polygons
 
 ```{r}
 # USFS
@@ -117,7 +119,7 @@ usfs_nepa_clean <- usfs_nepa |>
          national_forest_connection = NFSLANDU_2,
          watershed_name = name_1,
          contact = admin_di_1) |> 
-  mutate(dataset = 'CalVTP_ProposedProjects_Pnt_Scrape_Forest_HUC1',
+  mutate(dataset = 'USFS EDW FACTS',
          timing_plan = NA) |> 
   filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) |> 
   st_make_valid() |> 
@@ -129,8 +131,10 @@ usfs_nepa_clean <- usfs_nepa |>
 ### Combine Datasets
 
 **Notes**
-* Including all dataset records, number of rows: 1232 records 
-* Filtering by national forest and huc6, number rows: 318
+
+-   Including all dataset records, number of rows: 1232 records
+
+-   Filtering by national forest and huc6, number rows: 318
 
 ```{r}
 planned_restoration <- bind_rows(cal_vtp_clean, 
@@ -144,6 +148,7 @@ saveRDS(planned_restoration, here::here("data", "planned_restoration.RDS"))
 ```
 
 #### Map of all datasets
+
 ```{r}
 pal_forest <- colorFactor(
   palette   = "Set3", 
@@ -176,4 +181,3 @@ leaflet(planned_restoration)  |>
   )
 
 ```
-
