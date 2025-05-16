@@ -35,6 +35,40 @@ leaflet() |>
 
 saveRDS(nf_bounds, here::here('data', 'nf_boundaries.RDS'))
 
+# USFS SOPA and CalVTP datasets
+sopa_sf <- read_sf(here::here('data-raw', 'shapefiles', 'SOPA_Forest_Management_Scrape_Forest_HUC','SOPA_Forest_Management_Scrape_Forest_HUC.shp')) |>
+  st_transform("+proj=longlat +datum=WGS84") |>
+  glimpse()
+
+table(sopa_sf$NFSLANDU_2)
+
+leaflet() |>
+  addTiles() |>
+  addMarkers(data = sopa_sf)
+
+# CalVTP
+cal_vtp_raw <- read_sf(here::here('data-raw', 'shapefiles', 'CalVTP_ProposedProjects_Pnt_Scrape_Forest_HUC1','CalVTP_ProposedProjects_Pnt_Scrape_Forest_HUC1.shp')) |>
+  st_transform("+proj=longlat +datum=WGS84") |>
+  glimpse()
+
+table(cal_vtp_raw$CalVTP_P_3)
+
+leaflet() |>
+  addTiles() |>
+  addMarkers(data = cal_vtp_raw)
+
+# CalVTP
+usfs_nepa <- read_sf(here::here('data-raw', 'shapefiles', 'USFS_NEPA_Project_Areas_3857_Forest_HUC','USFS_NEPA_Project_Areas_3857_Forest_HUC.shp')) |>
+  st_transform("+proj=longlat +datum=WGS84") |>
+  glimpse()
+
+table(usfs_nepa$NFSLANDU_2)
+
+leaflet() |>
+  addTiles() |>
+  addPolygons(data = usfs_nepa)
+
+
 
 # watersheds --------------------------------------------------------------
 # NOTE: large geodatabases for CV and Klamath are currently stored on egnyte and the following file paths will need
