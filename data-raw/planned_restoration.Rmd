@@ -114,18 +114,20 @@ usfs_nepa <- read_sf(here::here('data-raw', 'shapefiles', 'USFS_NEPA_Project_Are
 
 table(usfs_nepa$NFSLANDU_2, useNA = 'always')
 
-usfs_nepa_clean <- usfs_nepa |> 
-  select(project_name = name,
-         national_forest_connection = NFSLANDU_2,
-         watershed_name = name_1,
-         contact = admin_di_1) |> 
-  mutate(dataset = 'USFS EDW FACTS',
-         timing_plan = NA) |> 
-  filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) |> 
-  st_make_valid() |> 
-  mutate(geometry = st_centroid(geometry)) |> 
-  st_as_sf() |> 
-  glimpse()
+sf_use_s2(FALSE)
+
+usfs_nepa_clean <- usfs_nepa  |> 
+  select(project_name  = name,
+    national_forest_connection = NFSLANDU_2,
+    watershed_name = name_1,
+    contact = admin_di_1) |> 
+  mutate( dataset     = "USFS EDW FACTS",
+    timing_plan = NA)  |> 
+  st_make_valid()  |> 
+  mutate(geometry = st_centroid(geometry))  |> 
+  st_as_sf(crs = st_crs(usfs_nepa))
+
+sf_use_s2(TRUE)
 ```
 
 ### Combine Datasets
@@ -136,14 +138,22 @@ usfs_nepa_clean <- usfs_nepa |>
 
 -   Filtering by national forest and huc6, number rows: 318
 
+**Decision**
+
+-   FlowWest re-mapped the national forest connection using the same
+    methodology as the downstream users. This allowed for 2575 entries
+    of planned restoration. The mapping to HUC6 was consistent between
+    SIG and FlowWest and the the mapping of national forest connection
+    was very inconsistent. See: `data_processing.R` for comparison.
+
 ```{r}
 planned_restoration <- bind_rows(cal_vtp_clean, 
-                                 usfs_nepa_clean, # og: 685; filtered: 251
+                                 usfs_nepa_clean, 
                                  sopa_sf_clean) |> 
-  filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) |> 
+  # filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) |> 
   glimpse()
 
-saveRDS(planned_restoration, here::here("data", "planned_restoration.RDS"))
+saveRDS(planned_restoration, here::here("data-raw", "planned_restoration_combined.RDS"))
 
 ```
 

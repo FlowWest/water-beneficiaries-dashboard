@@ -247,24 +247,7 @@ observe({
                      fillOpacity = 0.8,
                      popup = popup_content,
                      group = "bene") |> 
-  addLegend("bottomright",
-            pal = bene_pal,
-            values = all_points$beneficiary_type,
-            title = "Beneficiary Type",
-            opacity = 1,
-            group = "bene") |> 
-    addLayersControl(
-      baseGroups = c("Default", "Greyscale", "Imagery"),
-      options = layersControlOptions(collapsed = FALSE)
-    )
-})
-
-observe({
-  proxy <- leafletProxy("map") 
-  
-  if (nrow(filtered_restoration()) > 0) {
-    proxy <- proxy |>
-      addCircleMarkers(
+     addCircleMarkers(
         data        = filtered_restoration(),
         radius      = 6,
         color       = "darkblue",
@@ -280,14 +263,22 @@ observe({
         ),
         group = "restoration"
       ) |>
-      addLegend(
+    addLegend("bottomright",
+              pal = bene_pal,
+              values = all_points$beneficiary_type,
+              title = "Beneficiary Type",
+              opacity = 1,
+              group = "bene") |> 
+    addLegend(
         position = "bottomright",
         colors   = "darkblue",
         labels   = "Planned Restoration",
         group    = "restoration",
-        opacity  = 1
-      )
-  }
+        opacity  = 1 ) |> 
+    addLayersControl(
+      baseGroups = c("Default", "Greyscale", "Imagery"),
+      options = layersControlOptions(collapsed = FALSE)
+    )
 })
 
 observe({
@@ -376,7 +367,7 @@ div(style = "height: 720px; overflow-y: auto;",
 
 ```{r}
 output$restoration_catalog <- renderDT({
-
+  
   tmp_data <- filtered_restoration() |>
     st_drop_geometry() |> 
     rename(timing = timing_plan) |> 
