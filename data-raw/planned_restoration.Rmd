@@ -1,0 +1,201 @@
+---
+title: "Planned Restoration Data"
+author: "Maddee Rubenson (FlowWest)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(sf)
+library(leaflet)
+
+
+knitr::opts_chunk$set(echo = TRUE)
+
+nf_boundaries <- readRDS(here::here("data", "nf_boundaries.RDS"))
+watersheds <- readRDS(here::here("data", "watersheds.RDS"))
+
+```
+
+Three datasets were provided by SIG:
+
+-   [SOPA Forest Management](https://www.fs.usda.gov/sopa/index.php)
+
+-   [CalVTP Proposed
+    Projects](https://calfire-umb05.azurewebsites.net/projects-and-programs/calvtp-homepage-and-storymap/)
+
+-   [USFS NEPA Planned
+    Projects](https://data.fs.usda.gov/geodata/edw/datasets.php)
+
+Due to size constraints, all raw data is stored here:
+<https://drive.google.com/drive/u/0/folders/1EPi8wEZatXhZZfhvTjTcUZjuKSINT3o7>
+
+**Objective**
+
+Standardize these datasets into a single `planned_restoration` data
+object with consistent formatting
+
+### SOPA Forest Management
+
+**Notes**
+
+-   `Web_Link` is an invalid URL
+
+**SIG Processing**
+
+1.  Used the attribute descriptions to assign forest boundary
+
+2.  The spatial location is sometimes the address that isn't necessarily
+    in the forest boundary but the name of the national forest should be
+    correct
+
+```{r}
+# USFS SOPA and CalVTP datasets
+sopa_sf <- read_sf(here::here('data-raw', 'shapefiles', 'SOPA_Forest_Management_Scrape_Forest_HUC','SOPA_Forest_Management_Scrape_Forest_HUC.shp')) |>
+  st_transform("+proj=longlat +datum=WGS84") |>
+  glimpse()
+
+table(sopa_sf$NFSLANDU_2)
+
+sopa_sf_clean <- sopa_sf |> 
+  select(project_name = Project_Na,
+         national_forest_connection = NFSLANDU_2,
+         watershed_name = Name,
+         timing_plan = Decision, 
+         contact = Project_co) |> 
+  mutate(dataset = 'USFS SOPA') |> 
+  glimpse()
+
+```
+
+### CALVTP Proposed Projects
+
+**Challenges/Notes**
+
+-    Most of the national forest column is `NA`.
+
+**SIG processing**
+
+-   Used a straight spatial join; `NA`s are because it's not connected
+    to forest service boundary (county, private, state) and therefore
+    those are filtered out
+
+```{r}
+# CalVTP
+cal_vtp_raw <- read_sf(here::here('data-raw', 'shapefiles', 'CalVTP_ProposedProjects_Pnt_Scrape_Forest_HUC1','CalVTP_ProposedProjects_Pnt_Scrape_Forest_HUC1.shp')) |>
+  st_transform("+proj=longlat +datum=WGS84") |>
+  glimpse()
+
+table(cal_vtp_raw$CalVTP_P_3, useNA = 'always')
+
+cal_vtp_clean <- cal_vtp_raw |> 
+  select(project_name = L0CalVTP_P,
+         national_forest_connection = CalVTP_P_3,
+         watershed_name = CalVTP_P_8,
+         timing_plan = L0CalVTP_8, 
+         contact = L0CalVTP_5) |> 
+  mutate(dataset = 'CalVTP') |> 
+  glimpse()
+
+```
+
+### USFS NEPA Project Areas
+
+**Notes**
+
+-   Unsure what `rev_date` refers to but assuming that it is not the
+    timing for the planned project. Unsure timing so leaving it as `NA`
+
+-   To remain consistent with the other two datasets, took the centroid
+    of the polygons
+
+**SIG processing**
+
+-   Used a spatial join of the centroids
+
+```{r}
+# USFS
+usfs_nepa <- read_sf(here::here('data-raw', 'shapefiles', 'USFS_NEPA_Project_Areas_3857_Forest_HUC','USFS_NEPA_Project_Areas_3857_Forest_HUC.shp')) |>
+  st_transform("+proj=longlat +datum=WGS84") |>
+  glimpse()
+
+table(usfs_nepa$NFSLANDU_2, useNA = 'always')
+
+sf_use_s2(FALSE)
+
+usfs_nepa_clean <- usfs_nepa |> 
+  select(project_name  = name,
+         national_forest_connection = NFSLANDU_2,
+         watershed_name = name_1,
+         contact = admin_di_1) |> 
+  mutate(dataset = "USFS EDW FACTS",
+         timing_plan = NA) |>
+  st_make_valid() |> 
+  mutate(geometry = st_centroid(geometry)) |> 
+  st_as_sf(crs = st_crs(usfs_nepa))
+
+sf_use_s2(TRUE)
+```
+
+### Combine Datasets
+
+**Notes**
+
+-   Including all dataset records, number of rows: 1232 records
+
+-   Filtering by national forest and huc6, number rows: 318
+
+**Final Dataset Decision**
+
+We decided to use the SIG-assigned national forest connections which
+significantly reduces the dataset but also links it to the forest
+service boundary. Notes on SIG processing are highlighted above.
+
+```{r}
+planned_restoration <- bind_rows(cal_vtp_clean, 
+                                 usfs_nepa_clean, 
+                                 sopa_sf_clean) |> 
+  filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) 
+
+saveRDS(planned_restoration, here::here("data", "planned_restoration.RDS"))
+
+```
+
+#### Map of all datasets
+
+```{r}
+pal_forest <- colorFactor(
+  palette = "Set3", 
+  domain = planned_restoration$national_forest_connection,
+  na.color = "lightgray")
+
+leaflet(planned_restoration)  |> 
+  addProviderTiles(providers$CartoDB.Positron)  |>    
+  addCircleMarkers(
+    radius = 6,
+    color = ~pal_forest(national_forest_connection),
+    stroke = FALSE,
+    fillOpacity = 0.8,
+    popup = ~paste0(
+      "<strong>Project Name:</strong> ", project_name, "<br/>",
+      "<strong>National Forest:</strong> ", 
+      ifelse(is.na(national_forest_connection), "None", national_forest_connection), "<br/>",
+      "<strong>Watershed:</strong> ", watershed_name, "<br/>",
+      "<strong>Timing Plan:</strong> ", timing_plan, "<br/>",
+      "<strong>Contact:</strong> ", contact, "<br/>",
+      "<strong>Dataset:</strong> ", dataset)
+    )  |> 
+  addLegend(
+    position = "bottomright",
+    pal = pal_forest,
+    values = ~national_forest_connection,
+    title = "National Forest"
+  )
+
+```

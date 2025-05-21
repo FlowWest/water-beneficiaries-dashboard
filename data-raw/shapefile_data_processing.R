@@ -35,7 +35,6 @@ leaflet() |>
 
 saveRDS(nf_bounds, here::here('data', 'nf_boundaries.RDS'))
 
-
 # watersheds --------------------------------------------------------------
 # NOTE: large geodatabases for CV and Klamath are currently stored on egnyte and the following file paths will need
 # to be updated to accomodate a different computer
