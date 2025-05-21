@@ -47,6 +47,14 @@ object with consistent formatting
 
 -   `Web_Link` is an invalid URL
 
+**SIG Processing**
+
+1.  Used the attribute descriptions to assign forest boundary
+
+2.  The spatial location is sometimes the address that isn't necessarily
+    in the forest boundary but the name of the national forest should be
+    correct
+
 ```{r}
 # USFS SOPA and CalVTP datasets
 sopa_sf <- read_sf(here::here('data-raw', 'shapefiles', 'SOPA_Forest_Management_Scrape_Forest_HUC','SOPA_Forest_Management_Scrape_Forest_HUC.shp')) |>
@@ -70,12 +78,13 @@ sopa_sf_clean <- sopa_sf |>
 
 **Challenges/Notes**
 
--   I have the dataset filtered to either falling within the HUC6
-    watersheds OR the national forest boundaries. There are many more
-    connections with the HUC6 than the forest boundaries so when
-    integrated in the application, it will very few planned restorations
-    for selected national forests. Most of the national forest column is
-    `NA`.
+-    Most of the national forest column is `NA`.
+
+**SIG processing**
+
+-   Used a straight spatial join; `NA`s are because it's not connected
+    to forest service boundary (county, private, state) and therefore
+    those are filtered out
 
 ```{r}
 # CalVTP
@@ -106,6 +115,10 @@ cal_vtp_clean <- cal_vtp_raw |>
 -   To remain consistent with the other two datasets, took the centroid
     of the polygons
 
+**SIG processing**
+
+-   Used a spatial join of the centroids
+
 ```{r}
 # USFS
 usfs_nepa <- read_sf(here::here('data-raw', 'shapefiles', 'USFS_NEPA_Project_Areas_3857_Forest_HUC','USFS_NEPA_Project_Areas_3857_Forest_HUC.shp')) |>
@@ -118,11 +131,11 @@ sf_use_s2(FALSE)
 
 usfs_nepa_clean <- usfs_nepa  |> 
   select(project_name  = name,
-    national_forest_connection = NFSLANDU_2,
-    watershed_name = name_1,
-    contact = admin_di_1) |> 
+         national_forest_connection = NFSLANDU_2,
+         watershed_name = name_1,
+         contact = admin_di_1) |> 
   mutate( dataset     = "USFS EDW FACTS",
-    timing_plan = NA)  |> 
+          timing_plan = NA)  |> 
   st_make_valid()  |> 
   mutate(geometry = st_centroid(geometry))  |> 
   st_as_sf(crs = st_crs(usfs_nepa))
@@ -138,22 +151,19 @@ sf_use_s2(TRUE)
 
 -   Filtering by national forest and huc6, number rows: 318
 
-**Decision**
+**Final Dataset Decision**
 
--   FlowWest re-mapped the national forest connection using the same
-    methodology as the downstream users. This allowed for 2575 entries
-    of planned restoration. The mapping to HUC6 was consistent between
-    SIG and FlowWest and the the mapping of national forest connection
-    was very inconsistent. See: `data_processing.R` for comparison.
+We decided to use the SIG-assigned national forest connections which
+significantly reduces the dataset but also links it to the forest
+service boundary. Notes on SIG processing are highlighted above.
 
 ```{r}
 planned_restoration <- bind_rows(cal_vtp_clean, 
                                  usfs_nepa_clean, 
                                  sopa_sf_clean) |> 
-  # filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) |> 
-  glimpse()
+  filter(watershed_name %in% watersheds$name & national_forest_connection %in% nf_boundaries$name) 
 
-saveRDS(planned_restoration, here::here("data-raw", "planned_restoration_combined.RDS"))
+saveRDS(planned_restoration, here::here("data", "planned_restoration.RDS"))
 
 ```
 

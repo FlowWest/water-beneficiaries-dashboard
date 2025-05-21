@@ -129,13 +129,6 @@ dws_projects <- left_join(dws_clean, dws_contractor_type_raw) |>
   select(-pwsid, -district) |>
   glimpse()
 
-# planned restoration
-planned_restoration_raw <-readRDS(here::here("data-raw", "planned_restoration_combined.RDS")) |>
-  rename(old_nf_conn = national_forest_connection,
-         old_ws_name = watershed_name) |>
-  #select(-national_forest_connection, -watershed_name) |> # removing SIG logic
-  glimpse()
-
 # binding all datasets to process -----------------------------------------
 all_datasets_raw <- bind_rows(hydropower, swp, dws_projects, water_rights) |>
   st_make_valid()
@@ -144,7 +137,6 @@ all_datasets_raw <- bind_rows(hydropower, swp, dws_projects, water_rights) |>
 
 ## (1) assign watershed to datasets: if polygons/points fall within a watershed
 all_datasets_watershed <- st_join(all_datasets_raw, watersheds, left = TRUE) |> glimpse()
-planned_restoration_watershed <- st_join(planned_restoration_raw, watersheds, left = TRUE) |> glimpse()
 
 # bind cvp, since processing was done above using cvp_units
 all_datasets_with_ws <- bind_rows(all_datasets_watershed, cvp_watershed_clean)
@@ -168,18 +160,6 @@ all_datasets_results_raw <- left_join(all_datasets_with_ws, watershed_nf, by = "
   select(-national_forest_connection) |>
   rename(national_forest_connection = nf_name) |>
   glimpse()
-
-planned_restoration_results <- left_join(planned_restoration_watershed, watershed_nf, by = "watershed_name") |>
-  rename(national_forest_connection = nf_name) |>
-  glimpse()
-
-##### documentation of very different mapping to national forest boundaries between flowwest and SIG
-planned_restoration_results |> select(old_nf_conn, national_forest_connection, old_ws_name, watershed_name) |> View()
-
-planned_restoration_results_clean <- planned_restoration_results |>
-  select(-old_nf_conn, -old_ws_name) |>
-  filter(!is.na(national_forest_connection))
-
 
 ## Additional processing for drinking water systems and for those SWP contracts that do not fall within a watershed,
 # we will assume that they connect to Lassen NF
@@ -229,7 +209,6 @@ result_polygons <- all_datasets_results[geom_types %in% c("POLYGON", "MULTIPOLYG
 
 # save dataset ------------------------------------------------------------
 saveRDS(all_datasets_results, here::here("data", "all_datasets_results.RDS"))
-saveRDS(planned_restoration_results_clean, here::here("data", "planned_restoration.RDS"))
 
 # PLOTS -------------------------------------------------------------------
 # plotting both nf and watersheds, plus all_datasets to check accuracy
