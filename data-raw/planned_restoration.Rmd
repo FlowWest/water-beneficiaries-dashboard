@@ -129,15 +129,15 @@ table(usfs_nepa$NFSLANDU_2, useNA = 'always')
 
 sf_use_s2(FALSE)
 
-usfs_nepa_clean <- usfs_nepa  |> 
+usfs_nepa_clean <- usfs_nepa |> 
   select(project_name  = name,
          national_forest_connection = NFSLANDU_2,
          watershed_name = name_1,
          contact = admin_di_1) |> 
-  mutate( dataset     = "USFS EDW FACTS",
-          timing_plan = NA)  |> 
-  st_make_valid()  |> 
-  mutate(geometry = st_centroid(geometry))  |> 
+  mutate(dataset = "USFS EDW FACTS",
+         timing_plan = NA) |>
+  st_make_valid() |> 
+  mutate(geometry = st_centroid(geometry)) |> 
   st_as_sf(crs = st_crs(usfs_nepa))
 
 sf_use_s2(TRUE)
@@ -171,33 +171,31 @@ saveRDS(planned_restoration, here::here("data", "planned_restoration.RDS"))
 
 ```{r}
 pal_forest <- colorFactor(
-  palette   = "Set3", 
-  domain    = planned_restoration$national_forest_connection,
-  na.color  = "lightgray"
-)
+  palette = "Set3", 
+  domain = planned_restoration$national_forest_connection,
+  na.color = "lightgray")
 
 leaflet(planned_restoration)  |> 
   addProviderTiles(providers$CartoDB.Positron)  |>    
   addCircleMarkers(
-    radius       = 6,
-    color        = ~pal_forest(national_forest_connection),
-    stroke       = FALSE,
-    fillOpacity  = 0.8,
-    popup        = ~paste0(
+    radius = 6,
+    color = ~pal_forest(national_forest_connection),
+    stroke = FALSE,
+    fillOpacity = 0.8,
+    popup = ~paste0(
       "<strong>Project Name:</strong> ", project_name, "<br/>",
       "<strong>National Forest:</strong> ", 
       ifelse(is.na(national_forest_connection), "None", national_forest_connection), "<br/>",
       "<strong>Watershed:</strong> ", watershed_name, "<br/>",
       "<strong>Timing Plan:</strong> ", timing_plan, "<br/>",
       "<strong>Contact:</strong> ", contact, "<br/>",
-      "<strong>Dataset:</strong> ", dataset
-    )
-  )  |> 
+      "<strong>Dataset:</strong> ", dataset)
+    )  |> 
   addLegend(
-    position  = "bottomright",
-    pal       = pal_forest,
-    values    = ~national_forest_connection,
-    title     = "National Forest"
+    position = "bottomright",
+    pal = pal_forest,
+    values = ~national_forest_connection,
+    title = "National Forest"
   )
 
 ```
