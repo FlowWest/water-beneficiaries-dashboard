@@ -416,11 +416,13 @@ output$top_contractors_plot <- renderPlot({
     select(beneficiary_type, quantity_metric, quantity_unit, entity_name) |>
     st_drop_geometry() |>
     group_by(beneficiary_type, entity_name) |>
-    summarise(sum_quantity_metric = sum(quantity_metric)) |>
-    arrange(desc(sum_quantity_metric)) |>
-    slice_head(n = 10)
+    slice_max(quantity_metric, n = 1, with_ties = FALSE) |>
+    ungroup() |> 
+    slice_max(quantity_metric, n = 10, with_ties = FALSE) |>
+    arrange(desc(quantity_metric))
+
   
-  ggplot(top_entities, aes(x = reorder(entity_name, sum_quantity_metric), y = sum_quantity_metric, fill = beneficiary_type)) +
+  ggplot(top_entities, aes(x = reorder(entity_name, quantity_metric), y = quantity_metric, fill = beneficiary_type)) +
     geom_col() +
     coord_flip() +
     theme_minimal() +
@@ -441,6 +443,7 @@ output$top_contractors_plot <- renderPlot({
     ) +
     facet_grid(~beneficiary_type, scales = "free_x")
 })
+
 ```
 
 
